@@ -1,0 +1,38 @@
+{% extends 'portal.html' %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">AGREED SUPPORT</p><h1>Care plan · {{ patient.name }}</h1><p>Clinician-authored versions. Administrative interruptions never establish a relapse diagnosis.</p></div><a class="button outline" href="{{ url_for('med.continuity_queue') }}">Follow-up queue</a></div>
+{% for plan in versions %}
+<details class="panel" {% if loop.first %}open{% endif %}><summary>{{ 'Current' if loop.first else 'Previous' }} plan #{{ plan.id }} · {{ plan.created_at|localtime }}</summary>
+<dl class="care-details">
+<dt>Patient-agreed goals</dt><dd>{{ plan.goals }}</dd>
+<dt>Individually agreed early warning signs</dt><dd>{{ plan.warning_signs }}</dd>
+<dt>Preferred channels / communication consent</dt><dd>{{ plan.channels|join(', ') }} · {{ 'Consent given' if plan.communication_consent else 'Consent declined' }}</dd>
+<dt>Planned appointments</dt><dd>{{ plan.planned_appointments }}</dd>
+{% if plan.review_link %}<dt>Review workflow</dt><dd><a href="{{ url_for('med.review_plan',plan_id=plan.id) }}">Review dates and sign-off history</a></dd>{% endif %}<dt>Review due</dt><dd>{{ plan.review_at|localtime }}</dd>
+<dt>Responsible care-team member</dt><dd>{{ plan.owner_name }}</dd>
+<dt>Agreed response steps</dt><dd>{{ plan.response_steps }}</dd>
+<dt>Practice-approved urgent-help instructions</dt><dd>{{ plan.urgent_help }}</dd>
+<dt>Actual monitoring hours</dt><dd>{{ plan.monitoring_hours }}</dd>
+{% if show_clinical_rules %}<dt>Practice clinical definitions</dt><dd>{{ plan.clinical_definitions }}</dd>
+<dt>Clinician-approved rules / response times</dt><dd>{% for kind, minutes in plan.rules.items() %}<p>{{ kind|replace('_',' ')|title }} · {{ minutes }} elapsed minutes from recording</p>{% else %}No event rules enabled.{% endfor %}</dd>
+{% endif %}<dt>Patient-facing plan</dt><dd>{{ "Approved for patient viewing" if plan.patient_visible else "Not published to patient" }}</dd><dt>Authorship and agreement</dt><dd>Clinician #{{ plan.author_id }} · Patient agreement recorded {{ plan.agreed_at|localtime }}</dd>
+</dl></details>
+{% else %}<p class="notice">No approved plan. Check-ins and automatic follow-ups remain unavailable until a clinician agrees and records a plan.</p>{% endfor %}
+{% if membership.role == 'dr' %}
+<section class="panel form-panel"><h2>Agree a new plan version</h2><p>Enter the practice's actual arrangements. Blank rule times disable that event type. Times are elapsed minutes after recording, including outside monitoring hours; approve values that match the agreed service. There are no default response times or escalation rules.</p>
+<form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% for field, label in [('goals','Patient-agreed goals'),('warning_signs','Individually agreed early warning signs'),('planned_appointments','Planned appointments and dates'),('response_steps','Agreed response and escalation steps'),('urgent_help','Practice-approved urgent-help instructions'),('clinical_definitions','Practice definitions for deterioration, lapse and relapse')] %}
+<label>{{ label }}<textarea name="{{ field }}" rows="4" maxlength="4000" required></textarea></label>
+{% endfor %}
+<fieldset><legend>Preferred contact channels</legend>{% for c in ['phone','email','sms','portal'] %}<label class="checkbox"><input type="checkbox" name="channels" value="{{ c }}">{{ c|title }}</label>{% endfor %}</fieldset>
+<label>Communication consent<select name="communication_consent" required><option value="">Select agreed choice</option><option value="yes">Consent given for preferred channels</option><option value="no">Consent declined</option></select></label>
+<label>Actual monitoring hours, time zone and holiday arrangements<textarea name="monitoring_hours" maxlength="500" required></textarea></label>
+<label>Review date · Johannesburg<input type="datetime-local" name="review_at" required></label>
+<label>Responsible care-team member<select name="owner_id" required>{% for user in team %}<option value="{{ user.id }}">{{ user.name }}</option>{% endfor %}</select></label>
+<div class="full"><h3>Approve event rules and response times</h3><p>Missed appointments can open an administrative follow-up when staff mark no-show. Other events are explicitly recorded; overdue reviews require a staff check. Only a clinician can record clinical events using these definitions. No automatic clinical inference or escalation.</p></div>
+{% for kind, category in kinds.items() %}<label>{{ category|replace('_',' ')|title }} · {{ kind|replace('_',' ') }}<input type="number" name="rule_{{ kind }}" min="1" max="525600" placeholder="Disabled until approved (minutes)"></label>{% endfor %}
+<label class="checkbox full"><input type="checkbox" name="patient_agreed" required> I have recorded the patient's agreement to this plan, including goals, early warning signs, channels and consent choice.</label>
+<label class="checkbox full"><input type="checkbox" name="practice_approved" required> I approve these practice definitions, event rules, response times, monitoring hours and urgent-help instructions.</label>
+<label class="checkbox full"><input name="share_with_patient" type="checkbox">Approve the agreed goals, warning signs, response steps and contact arrangements for the patient-facing plan. Internal definitions and clinical event history remain separate.</label><div class="full"><button class="button">Save clinician-approved version</button></div>
+</form></section>{% endif %}
+{% endblock %}

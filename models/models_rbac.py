@@ -1,6 +1,6 @@
 from extensions import db
 
-ROLES = {'dr': 'Doctor', 'nurse': 'Nurse', 'admin': 'Administrator',
+ROLES = {'dr': 'Doctor / psychologist', 'nurse': 'Nurse', 'admin': 'Administrator',
          'dr_assist': 'Doctor assistant', 'patient': 'Patient'}
 
 

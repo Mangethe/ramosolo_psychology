@@ -1,0 +1,10 @@
+{% from 'partials/_brand.html' import brand %}
+<footer class="site-footer">
+  <div class="public-footer">
+    <div>{{ brand(url_for('med.home'),true) }}<p class="footer-practitioner">Ponky Ramosolo</p><p>Practice information and appointment enquiries.</p></div>
+    <div><h2>Care & appointments</h2><nav aria-label="Footer appointment links"><a href="{{ url_for('med.home') }}#services">Service enquiries</a><a href="{{ url_for('med.inpatient') }}">Inpatient enquiries</a><a href="{{ url_for('med.book') }}">Request an appointment</a><a href="{{ url_for('med.dashboard' if current_user.is_authenticated else 'auth.login') }}">{{ 'Open my portal' if current_user.is_authenticated else 'Portal sign in' }}</a></nav></div>
+    <div><h2>Contact & location</h2><p>Phone, email and address details are awaiting practice confirmation.</p><a class="footer-link" href="{{ url_for('med.book') }}">Contact through an appointment request</a><p>Sending a request does not confirm a booking.</p></div>
+    <div><h2>Your information</h2><nav aria-label="Footer privacy links"><a href="{{ url_for('med.privacy_notice') }}">POPIA / Privacy Notice · draft</a><a href="{{ url_for('med.data_management') }}">Data Management Declaration · draft</a><a href="{{ url_for('med.professional_information') }}">Professional Information · draft</a><a href="{{ official.hpcsa }}" rel="noreferrer noopener external">HPCSA · official website</a><a href="{{ official.regulator }}" rel="noreferrer noopener external">Information Regulator · official website</a></nav><p class="fine">Unpublished drafts; practice approval and confirmed privacy contact are still required.</p></div>
+  </div>
+  <div class="footer-bottom"><span>© {{ current_year }} Ramosolo · Le Sonto Medical</span><span>{{ 'Portal times: Africa/Johannesburg · SAST' if shell=='portal' else 'Appointment requests are not an emergency service.' }}</span></div>
+</footer>

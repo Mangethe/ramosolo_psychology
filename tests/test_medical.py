@@ -50,6 +50,8 @@ def as_user(env, role):
     client=app.test_client()
     with client.session_transaction() as session:
         session['_user_id']=users[role].get_id(); session['_fresh']=True
+        import time
+        session['_auth_started_at']=session['_auth_last_seen']=int(time.time())
     return client
 
 
@@ -148,6 +150,7 @@ def test_duplicate_open_admission_rejected(env):
 def test_statistics_distinct_boundary_and_never_seen(env):
     now=datetime(2026,11,14,12)
     ps=env[2]
+    env[4].admitted_at=now-timedelta(days=1)  # an ongoing stay must actually have begun at the test clock
     # Exactly 90 days is active; 90 days plus one microsecond is inactive.
     for patient,days,delta in [(ps[0],90,0),(ps[1],90,1)]:
         db.session.add(Appointment(patient_id=patient.id,doctor_id=patient.doctor_id,
@@ -173,10 +176,13 @@ def test_doctor_slot_collision_and_cancelled_reuse(env):
     client=as_user(env,'dr')
     p=Patient(name='Same doctor',institution_id=env[2][0].institution_id,doctor_id=env[1]['dr'].id)
     db.session.add(p);db.session.commit()
-    local=(env[3][0].starts_at+timedelta(hours=2)).isoformat(timespec='minutes')
+    from test_calendar import approved,local,utc_on,time
+    _,day=approved(env[2][0])
+    env[3][0].starts_at=utc_on(day,time(8));env[3][0].ends_at=utc_on(day,time(8,30));db.session.commit()
+    local=local(env[3][0].starts_at)
     form={'patient_id':p.id,'starts_at':local,'service':'Individual therapy'}
     response=client.post('/med/appointments',data=form,follow_redirects=True)
-    assert b'already has this slot' in response.data
+    assert b'unavailable' in response.data
     env[3][0].status='cancelled';db.session.commit()
     response=client.post('/med/appointments',data=form,follow_redirects=True)
     assert b'Appointment scheduled.' in response.data

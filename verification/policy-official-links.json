@@ -1,0 +1,60 @@
+{
+  "checked_date": "2026-11-16",
+  "method": "public HTTPS GET; status/redirect metadata only",
+  "links": [
+    {
+      "name": "regulator",
+      "url": "https://inforegulator.org.za/",
+      "status": 200,
+      "final_url": "https://inforegulator.org.za/"
+    },
+    {
+      "name": "complaints",
+      "url": "https://inforegulator.org.za/complaints/",
+      "status": 200,
+      "final_url": "https://inforegulator.org.za/complaints/"
+    },
+    {
+      "name": "popia_forms",
+      "url": "https://inforegulator.org.za/popia-forms/",
+      "status": 200,
+      "final_url": "https://inforegulator.org.za/popia-forms/"
+    },
+    {
+      "name": "paia",
+      "url": "https://inforegulator.org.za/paia/",
+      "status": 200,
+      "final_url": "https://inforegulator.org.za/paia/"
+    },
+    {
+      "name": "eservices",
+      "url": "https://eservices.inforegulator.org.za/services.aspx",
+      "status": 200,
+      "final_url": "https://eservices.inforegulator.org.za/services.aspx"
+    },
+    {
+      "name": "compromises",
+      "url": "https://inforegulator.org.za/2025/08/19/fact-sheet-handling-of-security-compromises/",
+      "status": 200,
+      "final_url": "https://inforegulator.org.za/2025/08/19/fact-sheet-handling-of-security-compromises/"
+    },
+    {
+      "name": "hpcsa",
+      "url": "https://www.hpcsa.co.za/",
+      "status": null,
+      "result": "unverified_connection_or_timeout"
+    },
+    {
+      "name": "register",
+      "url": "https://www.hpcsa.co.za/iregister/",
+      "status": null,
+      "result": "unverified_connection_or_timeout"
+    },
+    {
+      "name": "hpcsa_complaints",
+      "url": "https://hpcsa.co.za/Public/Complaints",
+      "status": null,
+      "result": "unverified_connection_or_timeout"
+    }
+  ]
+}

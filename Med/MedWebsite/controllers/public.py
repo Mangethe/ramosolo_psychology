@@ -5,6 +5,7 @@ from sqlalchemy import select
 from extensions import db
 from models import Institution, BookingRequest
 from medical_services import SERVICES, parse_local, utcnow
+from policy_info import POLICY, OFFICIAL_LINKS, CARD
 from . import bp
 
 
@@ -23,7 +24,22 @@ def home():
 
 @bp.get('/governance')
 def governance():
-    return render_template('governance.html')
+    return render_template('governance.html', policy=POLICY, official=OFFICIAL_LINKS)
+
+
+@bp.get('/privacy-notice')
+def privacy_notice():
+    return render_template('privacy_notice.html',policy=POLICY,official=OFFICIAL_LINKS)
+
+
+@bp.get('/data-management')
+def data_management():
+    return render_template('data_management.html',policy=POLICY,official=OFFICIAL_LINKS)
+
+
+@bp.get('/professional-information')
+def professional_information():
+    return render_template('professional_information.html',policy=POLICY,official=OFFICIAL_LINKS,card=CARD)
 
 
 @bp.get('/inpatient')

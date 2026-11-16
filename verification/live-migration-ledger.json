@@ -1,0 +1,461 @@
+{
+  "date": "2026-11-16",
+  "schema": "ramosolo",
+  "versions": [
+    {
+      "version": 1
+    },
+    {
+      "version": 2
+    },
+    {
+      "version": 3
+    },
+    {
+      "version": 4
+    },
+    {
+      "version": 5
+    },
+    {
+      "version": 6
+    }
+  ],
+  "required_columns_metadata": [
+    {
+      "table_name": "appointments",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "patient_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "starts_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "service",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "booking_request_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "ends_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "occupied_until",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "hold_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "visit_kind",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "schedule_version",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "calendar_uid",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "appointments",
+      "column_name": "was_confirmed",
+      "data_type": "boolean",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "email",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "phone",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "service",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "preferred_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "consent_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "token_digest",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "token_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "code_digest",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "code_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "verification_attempts",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "requested_doctor_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "visit_kind",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "booking_requests",
+      "column_name": "emergency_requested",
+      "data_type": "boolean",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "total",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "currency",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "state",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "voided_by",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "voided_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "created_by",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_invoices",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": true
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "invoice_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "kind",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "amount",
+      "data_type": "numeric",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "method",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "original_receipt_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "reason",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "effective_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "recorded_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "actor_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    },
+    {
+      "table_name": "medical_payment_entries",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "has_default": false
+    }
+  ],
+  "access": "Connected Supabase tool; metadata and migration version numbers only; no patient/payment rows"
+}

@@ -1,0 +1,47 @@
+{
+  "review_date": "2026-11-16",
+  "scope": "local synthetic only",
+  "live_operations": false,
+  "full_suite": {
+    "command": "$env:PYTHON_DOTENV_DISABLED='1'; $env:APP_ENV='test'; $env:DATABASE_URL='sqlite://'; $env:FLASK_SECRET_KEY='synthetic-coordination-full-suite'; python -m pytest -q",
+    "exit_code": 0,
+    "passed": 225,
+    "failed": 0,
+    "skipped": 0,
+    "xfailed": 3,
+    "warnings": 6,
+    "duration_seconds": 473.26,
+    "includes": "isolated native PostgreSQL migration, role and concurrency tests",
+    "note": "Collected before the two new regression tests; those were run separately."
+  },
+  "added_regressions": {
+    "command": "$env:PYTHON_DOTENV_DISABLED='1'; $env:APP_ENV='test'; $env:DATABASE_URL='sqlite://'; $env:FLASK_SECRET_KEY='synthetic-acceptance-review'; python -m pytest -q tests/test_calendar.py -k 'completed_history_cannot or guest_verification_code' --tb=short",
+    "exit_code": 0,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "deselected": 27,
+    "duration_seconds": 16.88
+  },
+  "browser": {
+    "command": "node verification/check_shell_browser.mjs",
+    "exit_code": 0,
+    "checks_passed": 45,
+    "checks_failed": 0,
+    "external_page_requests": 0,
+    "artifact": "verification/shell-browser-results.json"
+  },
+  "official_links": {
+    "command": "python verification/check_official_policy_links.py",
+    "exit_code": 0,
+    "http_200": 6,
+    "confirmed_http_failures": 0,
+    "unverified_connections": 3,
+    "note": "All three HPCSA probes timed out or could not connect; exit 0 only means the checker completed."
+  },
+  "whitespace": {
+    "command": "git diff --check -- . ':!node_modules'",
+    "exit_code": 0,
+    "note": "CRLF notices only"
+  }
+}
