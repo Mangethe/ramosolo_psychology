@@ -1,4 +1,28 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}My workspace{% endblock %} · Ramosolo</title><link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}"></head><body class="portal-body"><a class="skip" href="#main">Skip to dashboard</a><aside class="sidebar"><a class="brand" href="{{ url_for('med.dashboard') }}"><span class="brand-mark">r.</span><span>Ramosolo<small>LE SONTO MEDICAL</small></span></a><div class="workspace-label">YOUR WORKSPACE</div><nav aria-label="Workspace navigation">
-{% set medical=membership and membership.institution.kind=='medical' %}{% set role=membership.role if membership else '' %}
-{% set links=[('med.dashboard','Overview','◫')] %}{% if medical %}{% set links=links+[('med.appointments','My appointments' if role=='patient' else 'Appointments','▦')] %}{% if role!='patient' %}{% set links=links+[('med.patients','Patients','◎'),('med.admissions','Admissions','⊕')] %}{% endif %}{% if role=='admin' %}{% set links=links+[('admin.requests_queue','Booking requests','↙'),('admin.users','Users & roles','♧'),('admin.audit_log','Activity log','≡')] %}{% endif %}{% endif %}{% set links=links+[('admin.institutions','Institutions','▥')] %}
-{% for endpoint,label,icon in links %}<a href="{{ url_for(endpoint) }}" {% if request.endpoint==endpoint %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">{{ icon }}</span>{{ label }}</a>{% endfor %}</nav><div class="sidebar-bottom"><div class="institution-note"><span class="eyebrow">CURRENT INSTITUTION</span><strong>{{ membership.institution.name if membership else 'No institution assigned' }}</strong><small>{{ membership.institution.kind|title if membership else 'Contact your administrator' }}</small></div><a href="{{ url_for('med.home') }}">Practice website ↗</a></div></aside><div class="workspace"><header class="workspace-header"><span class="breadcrumb">Medical portal <span>/</span> {{ roles.get(role,'Member') }}</span><div class="account"><span class="avatar">{{ current_user.name[:1] }}</span><span>{{ current_user.name }}<small>{{ roles.get(role,'Member') }}</small></span><form action="{{ url_for('auth.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout">Sign out</button></form></div></header><main id="main" class="workspace-main">{% include 'partials/flashes.html' %}{% block content %}{% endblock %}</main><footer class="workspace-footer">Ramosolo / Le Sonto <span>Times shown in Africa/Johannesburg · SAST</span></footer></div></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102c4c">
+  <title>{% block title %}My workspace{% endblock %} · Ramosolo</title>
+  {% block framework_css %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
+  {% block extra_css %}{% endblock %}{% block head %}{% endblock %}
+</head>
+<body class="portal-body">
+  <a class="skip" href="#main">Skip to workspace content</a>
+  {% set shell='portal' %}{% include 'partials/_navbar.html' %}
+  <div class="portal-layout">
+    {% include 'partials/_portal_nav.html' %}
+    {% set role=membership.role if membership else '' %}
+    <div class="workspace">
+      <header class="workspace-header">
+        <span class="breadcrumb">Practice portal <span>/</span> {{ roles.get(role,'Member') }}</span>
+        <div class="account"><span class="avatar" aria-hidden="true">{{ current_user.name[:1] }}</span><span>{{ current_user.name }}<small>{{ roles.get(role,'Member') }}</small></span><form action="{{ url_for('auth.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout">Sign out</button></form></div>
+      </header>
+      <main id="main" class="workspace-main" tabindex="-1">{% include 'partials/flashes.html' %}{% block content %}{% endblock %}</main>
+    </div>
+  </div>
+  {% include 'partials/_footer.html' %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

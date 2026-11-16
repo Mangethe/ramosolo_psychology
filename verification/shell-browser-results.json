@@ -1,0 +1,86 @@
+{
+  "synthetic": true,
+  "externalRequests": [],
+  "checks": [
+    "Desktop public home: no document horizontal overflow",
+    "anonymous: 10 local navigation/footer targets and fragments return authorized pages",
+    "anonymous: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Keyboard skip link focuses main",
+    "Mobile public home: no document horizontal overflow",
+    "Mobile public menu opens by Enter; Tab reaches Home",
+    "Reduced-motion media query active",
+    "Mobile /inpatient: no document horizontal overflow",
+    "Mobile /governance: no document horizontal overflow",
+    "Mobile /privacy-notice: no document horizontal overflow",
+    "Desktop /privacy-notice: no document horizontal overflow",
+    "Mobile /data-management: no document horizontal overflow",
+    "Desktop /data-management: no document horizontal overflow",
+    "Mobile /professional-information: no document horizontal overflow",
+    "Desktop /professional-information: no document horizontal overflow",
+    "Mobile /book: no document horizontal overflow",
+    "Mobile /auth/login: no document horizontal overflow",
+    "Mobile patient workspace: no document horizontal overflow",
+    "patient: workspace menu keyboard navigation and authenticated CSRF login",
+    "patient: 17 local navigation/footer targets and fragments return authorized pages",
+    "patient: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Desktop patient workspace: no document horizontal overflow",
+    "Mobile dr_assist workspace: no document horizontal overflow",
+    "dr_assist: workspace menu keyboard navigation and authenticated CSRF login",
+    "dr_assist: 18 local navigation/footer targets and fragments return authorized pages",
+    "dr_assist: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Mobile appointment table scrolls with ArrowRight when keyboard focused",
+    "Desktop dr_assist workspace: no document horizontal overflow",
+    "Mobile nurse workspace: no document horizontal overflow",
+    "nurse: workspace menu keyboard navigation and authenticated CSRF login",
+    "nurse: 18 local navigation/footer targets and fragments return authorized pages",
+    "nurse: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Desktop nurse workspace: no document horizontal overflow",
+    "Mobile dr workspace: no document horizontal overflow",
+    "dr: workspace menu keyboard navigation and authenticated CSRF login",
+    "dr: 20 local navigation/footer targets and fragments return authorized pages",
+    "dr: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Desktop dr workspace: no document horizontal overflow",
+    "Mobile admin workspace: no document horizontal overflow",
+    "admin: workspace menu keyboard navigation and authenticated CSRF login",
+    "admin: 23 local navigation/footer targets and fragments return authorized pages",
+    "admin: HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries",
+    "Desktop admin workspace: no document horizontal overflow",
+    "Browser accessibility tree includes main landmark",
+    "No external page requests or chat integration"
+  ],
+  "screenshots": [
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-desktop.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-mobile.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-mobile-menu.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\privacy-draft-desktop.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\professional-draft-mobile.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\login-mobile.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-mobile-menu.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-mobile-table.png",
+    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-desktop.png"
+  ],
+  "output": "C:/Temp/ramosolo-shell-5U8xWf",
+  "authRequestOrigins": [
+    {
+      "destination": "http://127.0.0.1:63897",
+      "origin": "http://127.0.0.1:63897"
+    },
+    {
+      "destination": "http://127.0.0.1:63897",
+      "origin": "http://127.0.0.1:63897"
+    },
+    {
+      "destination": "http://127.0.0.1:63897",
+      "origin": "http://127.0.0.1:63897"
+    },
+    {
+      "destination": "http://127.0.0.1:63897",
+      "origin": "http://127.0.0.1:63897"
+    },
+    {
+      "destination": "http://127.0.0.1:63897",
+      "origin": "http://127.0.0.1:63897"
+    }
+  ],
+  "status": "passed"
+}

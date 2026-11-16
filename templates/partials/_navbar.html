@@ -1,0 +1,22 @@
+{% from 'partials/_brand.html' import brand %}
+{% macro public_links(mobile=false) -%}
+<nav aria-label="{{ 'Mobile public navigation' if mobile else 'Public navigation' }}">
+  <a href="{{ url_for('med.home') }}"{% if request.endpoint=='med.home' %} class="active" aria-current="page"{% endif %}>Home</a>
+  <a href="{{ url_for('med.home') }}#services">Services</a>
+  <a href="{{ url_for('med.inpatient') }}"{% if request.endpoint=='med.inpatient' %} class="active" aria-current="page"{% endif %}>Inpatient enquiries</a>
+  <a href="{{ url_for('med.home') }}#contact">Contact</a>
+  <a href="{{ url_for('med.governance') }}"{% if request.endpoint in ['med.governance','med.privacy_notice','med.data_management','med.professional_information'] %} class="active" aria-current="{{ 'page' if request.endpoint=='med.governance' else 'location' }}"{% endif %}>Privacy</a>
+  <a class="portal-entry{{ ' active' if request.endpoint=='auth.login' or shell=='portal' else '' }}" href="{{ url_for('med.dashboard' if current_user.is_authenticated else 'auth.login') }}"{% if request.endpoint=='auth.login' or shell=='portal' %} aria-current="{{ 'page' if request.endpoint in ['auth.login','med.dashboard'] else 'location' }}"{% endif %}>{{ 'My portal' if current_user.is_authenticated else 'Portal sign in' }}</a>
+</nav>
+{%- endmacro %}
+<header class="site-header">
+  <div class="public-header">
+    {{ brand(url_for('med.home')) }}
+    <div class="desktop-public-nav">{{ public_links() }}</div>
+    <a class="button appointment-action" href="{{ url_for('med.book') }}"{% if request.endpoint=='med.book' %} aria-current="page"{% endif %}>Request an appointment</a>
+    <details class="mobile-public-menu">
+      <summary>Menu</summary>
+      {{ public_links(true) }}
+    </details>
+  </div>
+</header>

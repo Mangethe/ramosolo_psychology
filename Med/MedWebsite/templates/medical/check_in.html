@@ -1,0 +1,13 @@
+{% extends 'portal.html' %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">OPTIONAL SUPPORT</p><h1>Ask for contact or check in</h1><p>Submissions are optional and are not continuously monitored. They do not change your appointments or access to care.</p></div></div>
+{% for patient,plan in instructions %}<section class="panel">
+{% if plan %}<h2>Actual monitoring hours</h2><p class="notice care-text">{{ plan.monitoring_hours }}</p><h3>Agreed urgent-help instructions</h3><p class="care-text">{{ plan.urgent_help }}</p><p>Use these agreed instructions for urgent help. Do not wait for a reply to a portal submission.</p>
+{% if 'contact_request' in plan.rules or 'check_in' in plan.rules %}<form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="patient_id" value="{{ patient.id }}">
+<label>What would you like to submit?<select name="kind">{% if 'contact_request' in plan.rules %}<option value="contact_request">Please contact me</option>{% endif %}{% if 'check_in' in plan.rules %}<option value="check_in">An agreed check-in</option>{% endif %}</select></label>
+<label>Your message<textarea name="reason" maxlength="2000" rows="5" required></textarea></label>
+<label class="checkbox full"><input name="monitoring_understood" type="checkbox" required>I understand the monitoring hours above and that submissions are not continuously monitored.</label><div class="full"><button class="button">Submit for review</button></div></form>
+{% else %}<p>Online submissions have not been enabled by your clinician. Use your usual agreed practice contact channel.</p>{% endif %}
+{% else %}<p class="notice">Monitoring hours and an agreed check-in plan have not been recorded. Online submissions are unavailable. Contact the practice through your usual channel to agree arrangements.</p>{% endif %}
+</section>{% else %}<p>No linked patient account in this medical institution. Contact the practice.</p>{% endfor %}
+{% endblock %}

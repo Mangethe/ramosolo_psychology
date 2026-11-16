@@ -1,0 +1,58 @@
+{
+  "schema": "ramosolo",
+  "expected_ledger": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "proposed_versions": [
+    7,
+    8
+  ],
+  "live_execution": "not authorized and not performed",
+  "credentials": "existing connected metadata tool; no values read",
+  "migrations": {
+    "007_ramosolo_care_foundation.sql": {
+      "sha256": "90c33a59d6c7126dd571cc084ffe9a34dc1889627c6a059c38256126616eadbf",
+      "new_tables": [
+        "care_plans",
+        "patient_permissions",
+        "clinical_records",
+        "nursing_observations",
+        "external_practitioners",
+        "patient_preferences",
+        "continuity_events",
+        "continuity_history",
+        "continuity_notifications"
+      ]
+    },
+    "008_ramosolo_care_coordination.sql": {
+      "sha256": "ccc29e0d1552f5e121c7a948680260d1c29c74d95d823e469a15ba3f9d7cd443",
+      "new_tables": [
+        "coordination_policies",
+        "communication_decisions",
+        "discharge_followups",
+        "care_referrals",
+        "referral_clinical_records",
+        "care_plan_reviews",
+        "care_review_signoffs",
+        "coordination_history",
+        "coordination_coverage"
+      ]
+    }
+  },
+  "preserved_existing_tables": [
+    "appointments",
+    "booking_requests",
+    "medical_invoices",
+    "medical_payment_entries",
+    "demo_datasets",
+    "notification_outbox",
+    "communication_preferences"
+  ],
+  "rollback": "transaction rollback on error; after success retain histories and guards, revert approved application, use reviewed forward-only schema changes",
+  "browser_checks": "unverified: browser access host unavailable"
+}
