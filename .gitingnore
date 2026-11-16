@@ -1,12 +1,30 @@
-.gitignore
+# Secrets — keep the example tracked
 .env
-.env
+.env.*
+!.env.example
+
+# Python
 .venv/
 venv/
-instance/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
+
+# Local databases and runtime files
+instance/
+*.db
+*.sqlite
+*.sqlite3
+.booking-test-postgres/
+
+# Dependencies, logs and private uploads
 node_modules/
 *.log
 uploads/
+
+# Local fix bundle
+booking-login-fix/
+ramosolo_booking_login_fix.zip
+
+# Supabase CLI temporary state
+supabase/.temp/

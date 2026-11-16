@@ -639,3 +639,25 @@ migration, infrastructure, grant/RLS or regulatory change occurred.
 [Owner approval/evidence checklist](docs/privacy-owner-checklist.md),
 [application/infrastructure evidence](verification/policy-evidence.json) and the
 pages keep unresolved policy decisions separate from implemented behaviour.
+
+
+## Booking/login bundle application — 17 November 2026
+
+Reviewed and applied `booking-login-fix/booking-login-fix.patch` after a successful
+`git apply --check`. All six applied files match the supplied replacements.
+Existing/concurrent local ignore-file changes and the extracted bundle were left
+untouched. Updated schema-default documentation and restricted pytest discovery
+to application `tests` to avoid collecting duplicate reference-bundle tests.
+
+Full synthetic suite: **241 passed, 0 failed, 0 skipped, 3 xfailed, 6 warnings in
+414.01s**. Bundle module: **14 passed in 9.49s** (included in the full count).
+Isolated Chrome: **45 checks passed**, zero external page requests. Standalone
+read-only diagnostic against intentionally empty in-memory SQLite correctly
+returned exit 1 with missing objects; initialized synthetic CLI checks passed.
+The first full attempt stopped with one duplicate-reference collection error;
+this was resolved by `pytest.ini`, without excluding application tests.
+
+Exact commands, patch hash, limitations and preserved changes:
+[booking/login review](verification/booking-login-fix-review.md).
+No protected credential file, actual patient/database file or real account was
+read/tested. No live database change, service restart, migration, seed or deployment.

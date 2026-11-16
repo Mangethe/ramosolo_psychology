@@ -5,6 +5,7 @@ from flask import render_template, g, request, redirect, url_for, session
 from dotenv import load_dotenv
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from extensions import db, login_manager, csrf
 from config import settings
 from security import SecureFlask, configure_security
@@ -61,6 +62,8 @@ def create_app(test_config=None):
 
     @login_manager.user_loader
     def load_user(user_id):
+        if getattr(g, 'database_unavailable', False):
+            return None
         from security import valid_login_clock
         if not valid_login_clock(app):
             # Flask-Login can otherwise restore an old remember cookie after
@@ -91,8 +94,33 @@ def create_app(test_config=None):
     @app.after_request
     def response_headers(response):
         if response.status_code >= 400:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except SQLAlchemyError:
+                # A broken connection must not turn an error response into a
+                # second database exception.
+                db.session.remove()
         return response
+
+    @app.errorhandler(SQLAlchemyError)
+    def database_unavailable(error):
+        g.database_unavailable = True
+        db.session.remove()
+        # No SQL, parameters, connection strings or exception messages in logs.
+        app.logger.error('Database unavailable type=%s endpoint=%s',
+                         type(error).__name__, request.endpoint or 'unmatched')
+        # Do not render the shared shell: its authentication context may try to
+        # load the same unavailable database while displaying this error.
+        body = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<title>Temporarily unavailable · Ramosolo</title></head><body>'
+                '<main><h1>Temporarily unavailable</h1>'
+                '<p>We cannot reach the practice records right now. '
+                'Please try again later or contact the practice directly.</p>'
+                '<p>If you were submitting a request, do not assume it was saved. '
+                'Confirm with the practice before submitting again.</p>'
+                '<p><a href="/">Return to the practice website</a></p></main></body></html>')
+        return body, 503, {'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '60'}
 
     def portal_error(error):
         from werkzeug.exceptions import SecurityError

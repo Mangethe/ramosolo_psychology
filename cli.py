@@ -9,6 +9,45 @@ from medical_services import utcnow
 
 
 def register_commands(app):
+    @app.cli.command('check-connections')
+    @click.option('--only', type=click.Choice(['database']), default='database')
+    def check_connections(only):
+        """Read-only database/configuration check; never initialize or migrate data."""
+        from sqlalchemy.exc import SQLAlchemyError
+        try:
+            backend = db.engine.dialect.name
+            schema = current_app.config['DB_SCHEMA'] if backend == 'postgresql' else None
+            with db.engine.connect() as connection:
+                transaction = connection.begin()
+                try:
+                    if backend == 'postgresql':
+                        connection.execute(text('SET TRANSACTION READ ONLY'))
+                        connection.execute(text("SET LOCAL statement_timeout = '10s'"))
+                        active = connection.execute(text('SELECT current_schema()')).scalar_one()
+                        if active != schema:
+                            raise click.ClickException('Configured schema is not the active PostgreSQL schema. Check DB_SCHEMA, search_path and role permissions.')
+                    inspector = inspect(connection)
+                    existing = set(inspector.get_table_names(schema=schema))
+                    missing = []
+                    for table in db.metadata.sorted_tables:
+                        if table.name not in existing:
+                            missing.append(table.name + ' (table)')
+                            continue
+                        columns = {column['name'] for column in inspector.get_columns(table.name, schema=schema)}
+                        missing.extend(table.name + '.' + name for name in table.columns.keys() if name not in columns)
+                    if missing:
+                        # These are model identifiers, never row values or URLs.
+                        click.echo('Missing application objects: ' + ', '.join(sorted(missing)))
+                        raise click.ClickException('Database schema is incomplete for this checkout. Review the current additive migrations; do not replay the baseline.')
+                finally:
+                    transaction.rollback()
+            if backend == 'postgresql':
+                click.echo('OK: PostgreSQL connected; application tables and columns found in schema ' + schema + '. No records changed.')
+            else:
+                click.echo('OK: Local SQLite application tables and columns found. Supabase is not selected.')
+        except SQLAlchemyError:
+            raise click.ClickException('Database check failed. Verify server-side URL, SSL, schema and runtime permissions. No credentials printed.') from None
+
     @app.cli.command('upgrade-calendar')
     def upgrade_calendar():
         """Explicit local-only additive upgrade; never migrate a remote database."""

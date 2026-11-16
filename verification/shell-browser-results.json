@@ -49,37 +49,37 @@
     "No external page requests or chat integration"
   ],
   "screenshots": [
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-desktop.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-mobile.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\public-mobile-menu.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\privacy-draft-desktop.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\professional-draft-mobile.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\login-mobile.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-mobile-menu.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-mobile-table.png",
-    "C:\\Temp\\ramosolo-shell-5U8xWf\\assistant-desktop.png"
+    "C:\\Temp\\ramosolo-shell-juxBdi\\public-desktop.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\public-mobile.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\public-mobile-menu.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\privacy-draft-desktop.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\professional-draft-mobile.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\login-mobile.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\assistant-mobile-menu.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\assistant-mobile-table.png",
+    "C:\\Temp\\ramosolo-shell-juxBdi\\assistant-desktop.png"
   ],
-  "output": "C:/Temp/ramosolo-shell-5U8xWf",
+  "output": "C:/Temp/ramosolo-shell-juxBdi",
   "authRequestOrigins": [
     {
-      "destination": "http://127.0.0.1:63897",
-      "origin": "http://127.0.0.1:63897"
+      "destination": "http://127.0.0.1:60371",
+      "origin": "http://127.0.0.1:60371"
     },
     {
-      "destination": "http://127.0.0.1:63897",
-      "origin": "http://127.0.0.1:63897"
+      "destination": "http://127.0.0.1:60371",
+      "origin": "http://127.0.0.1:60371"
     },
     {
-      "destination": "http://127.0.0.1:63897",
-      "origin": "http://127.0.0.1:63897"
+      "destination": "http://127.0.0.1:60371",
+      "origin": "http://127.0.0.1:60371"
     },
     {
-      "destination": "http://127.0.0.1:63897",
-      "origin": "http://127.0.0.1:63897"
+      "destination": "http://127.0.0.1:60371",
+      "origin": "http://127.0.0.1:60371"
     },
     {
-      "destination": "http://127.0.0.1:63897",
-      "origin": "http://127.0.0.1:63897"
+      "destination": "http://127.0.0.1:60371",
+      "origin": "http://127.0.0.1:60371"
     }
   ],
   "status": "passed"
