@@ -15,11 +15,12 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('med.dashboard'))
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()[:254]
-        password = request.form.get('password', '')[:512]
-        user = db.session.scalar(select(User).where(User.email == email))
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        valid_input=bool(email and '@' in email and len(email)<=254 and 1<=len(password)<=512)
+        user = db.session.scalar(select(User).where(User.email == email)) if valid_input else None
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        valid = check_password_hash(user.password_hash if user else DUMMY_HASH, password)
+        valid = check_password_hash(user.password_hash if user else DUMMY_HASH, password if valid_input else '')
         blocked = user and user.locked_until and user.locked_until > now
         if user and user.enabled and valid and not blocked:
             user.failed_logins = 0
@@ -27,6 +28,8 @@ def login():
             db.session.commit()
             session.clear()
             login_user(user, remember=False)
+            from security import stamp_login
+            stamp_login()
             session.permanent = True
             return redirect(url_for('med.dashboard'))
         if user and not blocked:

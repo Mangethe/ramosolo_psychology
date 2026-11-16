@@ -1,0 +1,31 @@
+{
+  "review_date": "2026-11-16",
+  "source": "Protected Supabase connector; read-only catalog queries; no record data or credentials",
+  "schema": "ramosolo",
+  "table_count": 30,
+  "table_owner": "postgres (all 30)",
+  "tables_with_rls_enabled": 0,
+  "rls_policies": 0,
+  "browser_role_access": {
+    "anon": {"schema_usage": false, "schema_create": false, "tables_with_data_privilege": 0},
+    "authenticated": {"schema_usage": false, "schema_create": false, "tables_with_data_privilege": 0},
+    "service_role": {"schema_usage": false, "schema_create": false, "tables_with_data_privilege": 0},
+    "authenticator": {"schema_usage": false, "schema_create": false, "tables_with_data_privilege": 0}
+  },
+  "private_sequences_with_api_role_access": 0,
+  "private_functions_with_api_role_execute": 0,
+  "dedicated_runtime_role_found": false,
+  "postgres": {"superuser": false, "bypassrls": true, "create_role": true, "create_database": true, "all_private_tables_accessible": true},
+  "public_security_definer_function": {
+    "name": "rls_auto_enable",
+    "return_type": "event_trigger",
+    "search_path": "pg_catalog",
+    "api_execute_granted": true,
+    "ordinary_rpc_execution_tested": false,
+    "note": "Event-trigger return type; not evidence of an ordinary callable data RPC. No function source was retrieved or function invoked."
+  },
+  "postgrest_exposed_schema_setting_in_database_role_catalog": null,
+  "control_plane_exposed_schemas_verified": false,
+  "flask_deployed_runtime_identity_verified": false,
+  "note": "Active role names do not identify which connection is Flask. No environment/credentials were read to infer the deployment role. No live grants/RLS changed."
+}

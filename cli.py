@@ -2,13 +2,72 @@ import secrets
 from datetime import timedelta
 import click
 from flask import current_app
-from sqlalchemy import select, text
+from sqlalchemy import select, text, inspect
 from extensions import db
 from models import User, Institution, Membership, Patient, Appointment, Admission, CareAssignment, ROLES
 from medical_services import utcnow
 
 
 def register_commands(app):
+    @app.cli.command('upgrade-calendar')
+    def upgrade_calendar():
+        """Explicit local-only additive upgrade; never migrate a remote database."""
+        if current_app.config['PRODUCTION'] or db.engine.dialect.name!='sqlite':
+            raise click.ClickException('Local SQLite only. Review migrations/009_assistant_calendar.sql for PostgreSQL after 007/008.')
+        existing={c['name'] for c in inspect(db.engine).get_columns('appointments')} if inspect(db.engine).has_table('appointments') else set()
+        additions={'ends_at':'DATETIME','occupied_until':'DATETIME','care_type':'VARCHAR(20)',
+            'visit_kind':'VARCHAR(20)','schedule_version':'INTEGER NOT NULL DEFAULT 1',
+            'hold_expires_at':'DATETIME','institution_id':'INTEGER REFERENCES institutions(id)'}
+        if existing:
+            for column,definition in additions.items():
+                if column not in existing:
+                    db.session.execute(text(f'ALTER TABLE appointments ADD COLUMN {column} {definition}'))
+            db.session.commit()
+        db.create_all()
+        click.echo('Local calendar schema ready. No availability policy enabled, no invitation sent.')
+
+    def local_coordination_columns():
+        tables=inspect(db.engine).get_table_names()
+        for table,index in [('admissions','admission_patient_identity'),('care_plans','care_plan_patient_identity')]:
+            if table in tables:
+                db.session.execute(text(f'CREATE UNIQUE INDEX IF NOT EXISTS {index} ON {table}(id,patient_id)'))
+        db.session.commit()
+        if 'continuity_notifications' in inspect(db.engine).get_table_names():
+            existing={c['name'] for c in inspect(db.engine).get_columns('continuity_notifications')}
+            additions={'purpose':"VARCHAR(30) NOT NULL DEFAULT 'administrative_contact'",
+                'scope':"VARCHAR(200) NOT NULL DEFAULT 'practice'",
+                'state':"VARCHAR(20) NOT NULL DEFAULT 'suppressed'",
+                'result_code':"VARCHAR(80) NOT NULL DEFAULT 'legacy_consent_unverified'",
+                'decision_id':'INTEGER REFERENCES communication_decisions(id)'}
+            for column,definition in additions.items():
+                if column not in existing:
+                    db.session.execute(text(f'ALTER TABLE continuity_notifications ADD COLUMN {column} {definition}'))
+            db.session.commit()
+
+    @app.cli.command('upgrade-coordination')
+    def upgrade_coordination():
+        """Explicit local SQLite upgrade; never run PostgreSQL migrations automatically."""
+        if current_app.config['PRODUCTION'] or db.engine.dialect.name!='sqlite':
+            raise click.ClickException('Use the reviewed ramosolo 007/008 forward migrations; this command is SQLite only.')
+        db.create_all()
+        local_coordination_columns()
+        click.echo('Local coordination tables initialized. No consent granted, no plan published, no communication sent.')
+
+    @app.cli.command('upgrade-permissions')
+    def upgrade_permissions():
+        """Explicit local SQLite upgrade; PostgreSQL uses reviewed migration 003."""
+        if current_app.config['PRODUCTION'] or db.engine.dialect.name != 'sqlite':
+            raise click.ClickException('Use reviewed migrations/003_explicit_permissions.sql for PostgreSQL.')
+        tables = inspect(db.engine).get_table_names()
+        if 'care_plans' in tables:
+            columns = {c['name'] for c in inspect(db.engine).get_columns('care_plans')}
+            if 'patient_visible' not in columns:
+                db.session.execute(text('ALTER TABLE care_plans ADD COLUMN patient_visible BOOLEAN NOT NULL DEFAULT 0'))
+                db.session.commit()
+        db.create_all()
+        local_coordination_columns()
+        click.echo('Local permission tables initialized. No access granted and no existing plans published.')
+
     @app.cli.command('init-db')
     def init_db():
         """Initialize NEW local database. Production uses the versioned SQL migration."""

@@ -1,0 +1,6 @@
+{% macro brand(destination, compact=false) -%}
+<a class="brand{{ ' brand-compact' if compact else '' }}" href="{{ destination }}" aria-label="Ramosolo · Le Sonto Medical">
+  <span class="brand-mark" aria-hidden="true"><span class="butterfly-mark"></span></span>
+  <span>Ramosolo<small>LE SONTO MEDICAL</small></span>
+</a>
+{%- endmacro %}

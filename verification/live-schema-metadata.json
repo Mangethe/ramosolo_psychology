@@ -1,0 +1,1987 @@
+{
+  "source": "Supabase connected tool; information_schema metadata only",
+  "date": "2026-11-16",
+  "columns": [
+    {
+      "table_schema": "ramosolo",
+      "table_name": "admissions",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "admissions",
+      "column_name": "patient_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "admissions",
+      "column_name": "facility",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "admissions",
+      "column_name": "admitted_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "admissions",
+      "column_name": "discharged_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "appointment_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "kind",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "previous_status",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "previous_start",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "starts_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "actor_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_attendance_events",
+      "column_name": "recorded_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "appointment_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "scheduled_start",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "deadline",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "requested_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "requested_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "policy_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "confirmed_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointment_confirmation_requests",
+      "column_name": "confirmed_by",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "patient_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "starts_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "service",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "booking_request_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "ends_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "occupied_until",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "hold_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "visit_kind",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "schedule_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "calendar_uid",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "appointments",
+      "column_name": "was_confirmed",
+      "data_type": "boolean",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "followup_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "actor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "action",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followup_reviews",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "appointment_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "rule",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "policy_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "rule_version",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "reason",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "suggested_action",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "evidence",
+      "data_type": "json",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "state",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "revision",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "checked_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "attendance_followups",
+      "column_name": "obsolete_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "actor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "action",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "resource_type",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "resource_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "audit_events",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "policy_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "day",
+      "data_type": "date",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "kind",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "opens_at",
+      "data_type": "time without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "closes_at",
+      "data_type": "time without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "duration_minutes",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "first_minutes",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "assessment_minutes",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "break_minutes",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "override_closure",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "approved_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "reason",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_exceptions",
+      "column_name": "approved_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "daily_limit",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "holidays_confirmed",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "horizon_days",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_policies",
+      "column_name": "hold_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "policy_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "weekday",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "opens_at",
+      "data_type": "time without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "closes_at",
+      "data_type": "time without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "duration_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "first_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "assessment_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "availability_sessions",
+      "column_name": "break_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_rate_limits",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_rate_limits",
+      "column_name": "digest",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_rate_limits",
+      "column_name": "window_start",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_rate_limits",
+      "column_name": "attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "email",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "phone",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "service",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "preferred_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "consent_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "token_digest",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "token_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "code_digest",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "code_expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "verification_attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "requested_doctor_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "care_type",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "visit_kind",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "booking_requests",
+      "column_name": "emergency_requested",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "starts_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "ends_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "reason",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "released_by",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "released_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "created_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "calendar_blocks",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "care_assignments",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "care_assignments",
+      "column_name": "patient_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "care_assignments",
+      "column_name": "nurse_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "patient_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "booking_request_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "in_app_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "in_app_consent_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "email_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "sms_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "guest_verified_digest",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "changed_by",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "communication_preferences",
+      "column_name": "changed_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "anchor_date",
+      "data_type": "date",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "complete",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "demo_datasets",
+      "column_name": "manifest",
+      "data_type": "json",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "confirmation_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "failure_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "history_enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "confirmation_hours",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "lookahead_days",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "history_days",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "minimum_history",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "no_show_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "updated_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "followup_policies",
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "public_id",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "job_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "body",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "token_digest",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "expires_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "in_app_notifications",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "institutions",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "institutions",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "institutions",
+      "column_name": "kind",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "institutions",
+      "column_name": "address",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "institutions",
+      "column_name": "demo_dataset_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "total",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "currency",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "state",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "voided_by",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "voided_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "created_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_invoices",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "invoice_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "kind",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "amount",
+      "data_type": "numeric",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "method",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "original_receipt_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "reason",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "effective_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "recorded_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "actor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "submission_key",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "medical_payment_entries",
+      "column_name": "submission_fingerprint",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "user_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "role",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "memberships",
+      "column_name": "supervising_doctor_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "job_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "number",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "outcome",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "result_code",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_attempts",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "public_id",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "appointment_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "appointment_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "scheduled_start",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "preference_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "recipient_user_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "preference_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "consent_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "policy_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "policy_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "lead_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "channel",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "due_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "next_attempt_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "state",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "attempt_count",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "max_attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "sent_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "invalidated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "result_code",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "notification_outbox",
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "user_id",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "doctor_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "email",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "patients",
+      "column_name": "phone",
+      "data_type": "character varying",
+      "is_nullable": "YES"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "public_holidays",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "public_holidays",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "public_holidays",
+      "column_name": "day",
+      "data_type": "date",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "public_holidays",
+      "column_name": "label",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_leads",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_leads",
+      "column_name": "policy_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_leads",
+      "column_name": "minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "institution_id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "max_attempts",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "retry_seconds",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "link_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "catchup_minutes",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "updated_by",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "reminder_policies",
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "schema_versions",
+      "column_name": "version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "schema_versions",
+      "column_name": "applied_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "email",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "password_hash",
+      "data_type": "character varying",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "enabled",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "session_version",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "failed_logins",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_schema": "ramosolo",
+      "table_name": "users",
+      "column_name": "locked_until",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES"
+    }
+  ]
+}

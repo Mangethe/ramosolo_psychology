@@ -17,7 +17,7 @@ def parse_local(value):
     return datetime.fromisoformat(value).replace(tzinfo=TZ).astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def statistics(patients, now=None):
+def statistics(patients, now=None, include_admissions=True):
     now = now or utcnow()
     ids = [p.id for p in patients]
     latest = dict(db.session.execute(select(Appointment.patient_id, func.max(Appointment.starts_at)).where(
@@ -27,7 +27,7 @@ def statistics(patients, now=None):
     active = sum(seen >= cutoff for seen in latest.values())
     inactive = sum(seen < cutoff for seen in latest.values())
     admitted = set(db.session.scalars(select(Admission.patient_id).where(
-        Admission.patient_id.in_(ids), Admission.discharged_at.is_(None))))
+        Admission.patient_id.in_(ids), Admission.discharged_at.is_(None),Admission.admitted_at<=now))) if include_admissions else set()
     return dict(total=len(ids), active=active, inactive=inactive,
                 never_seen=len(ids)-len(latest), admitted=len(admitted)), latest, admitted
 

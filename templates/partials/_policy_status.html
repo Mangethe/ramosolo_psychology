@@ -1,0 +1,10 @@
+<div class="notice policy-draft" role="note">
+  <strong>Unpublished policy draft — not an approved practice notice</strong>
+  <p>Version {{ policy.version }} · Prepared {{ policy.prepared_at }}<br>Effective date: {{ policy.effective_at }}.</p>
+  <p>Legal responsible-party details and an approved privacy contact are still required. Do not send identity documents or clinical records through the appointment form.</p>
+</div>
+<nav class="policy-navigation" aria-label="Practice information pages">
+  <a href="{{ url_for('med.privacy_notice') }}"{% if request.endpoint=='med.privacy_notice' %} aria-current="page"{% endif %}>POPIA / Privacy Notice</a>
+  <a href="{{ url_for('med.data_management') }}"{% if request.endpoint=='med.data_management' %} aria-current="page"{% endif %}>Data Management Declaration</a>
+  <a href="{{ url_for('med.professional_information') }}"{% if request.endpoint=='med.professional_information' %} aria-current="page"{% endif %}>Professional Information</a>
+</nav>

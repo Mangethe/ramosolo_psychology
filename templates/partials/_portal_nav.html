@@ -1,0 +1,35 @@
+{% set medical=membership and membership.institution.kind=='medical' %}
+{% set role=membership.role if membership else '' %}
+{% set links=[('med.dashboard','Overview')] %}
+{% if medical %}
+  {% set links=links+[('med.appointments','My appointments' if role=='patient' else 'Appointments')] %}
+  {% if capability('schedule') %}{% set links=links+[('med.calendar','Operational calendar')] %}{% endif %}
+  {% if role=='patient' %}
+    {% set links=links+[('med.my_care_plan','My care plan'),('med.my_agreed_actions','My agreed actions'),('med.check_in','Optional check-in'),('med.preferences','Contact preferences')] %}
+  {% elif capability('operational') %}
+    {% set links=links+[('med.patients','Patients'),('med.my_actions','My actions'),('med.referrals','Referral tracking'),('med.coordination_consent','Communication consent')] %}
+    {% if capability('admissions') %}{% set links=links+[('med.admissions','Admissions')] %}{% endif %}
+  {% endif %}
+  {% if capability('accounts') %}{% set links=links+[('admin.requests_queue','Booking requests'),('admin.users','Users & roles'),('admin.audit_log','Activity log')] %}{% endif %}
+  {% if capability('export') %}{% set links=links+[('med.export_records','Authorized exports')] %}{% endif %}
+  {% set links=links+[('med.permission_matrix','Roles & permissions')] %}
+{% endif %}
+{% set links=links+[('admin.institutions','Institutions')] %}
+{% set nav_groups={
+  'med.patients': ['med.patients','med.patient_detail','med.care_plan','med.clinical_records','med.observations','med.external_practitioners','med.patient_permissions','med.coordination_cover'],
+  'med.calendar': ['med.calendar','med.calendar_availability'],
+  'med.referrals': ['med.referrals','med.referral_detail'],
+  'med.my_actions': ['med.my_actions','med.discharge_followup','med.review_plan','med.legacy_followup'],
+  'med.coordination_consent': ['med.coordination_consent','med.coordination_policies']
+} %}
+{% macro workspace_links(mobile=false) -%}
+<nav aria-label="{{ 'Mobile workspace navigation' if mobile else 'Workspace navigation' }}">
+  {% for endpoint,label in links %}<a href="{{ url_for(endpoint) }}"{% if request.endpoint in nav_groups.get(endpoint,[endpoint]) %} class="active" aria-current="{{ 'page' if request.endpoint==endpoint else 'location' }}"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{%- endmacro %}
+<aside class="sidebar" aria-label="Practice workspace">
+  <div class="workspace-label">YOUR WORKSPACE</div>
+  <div class="desktop-workspace-nav">{{ workspace_links() }}</div>
+  <details class="mobile-workspace-menu"><summary>Workspace menu</summary>{{ workspace_links(true) }}</details>
+  <div class="sidebar-bottom"><div class="institution-note"><span class="eyebrow">CURRENT INSTITUTION</span><strong>{{ membership.institution.name if membership else 'No institution assigned' }}</strong><small>{{ membership.institution.kind|title if membership else 'Contact your administrator' }}</small></div><a href="{{ url_for('med.home') }}">Practice website</a></div>
+</aside>

@@ -1,0 +1,42 @@
+{
+  "review_date": "2026-11-16",
+  "policy_version": "0.1-draft",
+  "effective_date": null,
+  "approved_privacy_contact": null,
+  "responsible_legal_entity_confirmed": false,
+  "sources": {
+    "practice_card": "Two user-supplied business-card images inspected read-only; source-attributed professional/service/contact text; no registration digits published",
+    "application": "Current public/auth/permission/coordination/scheduling controllers, models, templates, audit/security configuration and test workflow inspected",
+    "database": "Existing sanitized read-only schema/security snapshots reviewed; no patient records or credential files read",
+    "fresh_infrastructure_check": "Protected Supabase project lookup failed during OAuth token refresh; no new provider-region evidence available"
+  },
+  "verified_code_behavior": [
+    "Public booking is an enquiry with limited contact agreement; not account creation or confirmed booking",
+    "Institution/assignment and separate clinical-resource checks; scoped exports and metadata audit events",
+    "Purpose/channel consent history and suppression/recheck of unsent optional notices",
+    "Patient-specific approved-plan monitoring hours; no general practice hours supplied",
+    "Internal calendar/referrals; synthetic guest-delivery sink and sandbox notification previews",
+    "No external referral transmission, live email/SMS/payment adapter, chat/AI or analytics tracker in this checkout",
+    "Hashed passwords; signed nonclinical session data; no-store responses; CSRF; restricted public assets"
+  ],
+  "unverified_production_facts": [
+    "Web host, runtime database role, current provider inventory and operator contracts",
+    "Processing/support/backup regions and cross-border arrangements",
+    "Backup schedule/retention/encryption/recovery objectives and restore evidence",
+    "Production TLS edge/certificates, key handling, logs and monitoring",
+    "Approved retention/disposal, identity verification, children/caregiver policy and incident response",
+    "Approved responsible party/privacy contact/Information Officer and actual contact hours",
+    "Current registration details, contact digits and street spelling from the card"
+  ],
+  "official_link_report": "verification/policy-official-links.json",
+  "official_sources": [
+    "https://inforegulator.org.za/complaints/",
+    "https://inforegulator.org.za/popia-forms/",
+    "https://inforegulator.org.za/paia/",
+    "https://eservices.inforegulator.org.za/services.aspx",
+    "https://inforegulator.org.za/2025/08/19/fact-sheet-handling-of-security-compromises/",
+    "https://www.hpcsa.co.za/iregister/",
+    "https://hpcsa.co.za/Public/Complaints"
+  ],
+  "changes_not_performed": ["officer registration", "regulatory submission", "live infrastructure", "live migration/grants/RLS", "messages", "patient-record access"]
+}

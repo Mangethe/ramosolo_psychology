@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import User, Institution, Membership, Patient, BookingRequest, AuditEvent, ROLES
-from access import require_roles, audit, accessible_patient
+from access import require_roles, require_capability, audit, accessible_patient
 from medical_services import doctors
 
 bp = Blueprint('admin', __name__)
@@ -23,7 +23,7 @@ def institutions():
 
 
 @bp.route('/admin/users', methods=['GET', 'POST'])
-@require_roles('admin')
+@require_capability('accounts')
 def users():
     institution_id = g.membership.institution_id
     med_doctors = doctors(institution_id)
@@ -77,7 +77,7 @@ def users():
 
 
 @bp.post('/admin/users/<int:member_id>/toggle')
-@require_roles('admin')
+@require_capability('accounts')
 def toggle_member(member_id):
     member = db.session.scalar(select(Membership).where(Membership.id == member_id,
         Membership.institution_id == g.membership.institution_id))

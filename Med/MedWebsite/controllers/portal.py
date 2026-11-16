@@ -5,13 +5,27 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import Patient, Appointment, Admission, Membership, CareAssignment, User
-from access import require_roles, patient_scope, accessible_patient, audit
+from access import require_roles, require_capability, patient_scope, accessible_patient, audit, audit_views, ROLE_MATRIX
 from medical_services import SERVICES, utcnow, parse_local, statistics, doctors, TZ
 from . import bp
+from continuity_services import current_plan, record_event, archive_events
 
-ALL = ('dr', 'nurse', 'admin', 'dr_assist', 'patient')
-STAFF = ('dr', 'nurse', 'admin', 'dr_assist')
-SCHEDULERS = ('dr', 'admin', 'dr_assist')
+ALL = tuple(ROLE_MATRIX)
+STAFF = tuple(role for role, permissions in ROLE_MATRIX.items() if 'operational' in permissions)
+SCHEDULERS = tuple(role for role, permissions in ROLE_MATRIX.items() if 'schedule' in permissions)
+
+
+def locked_appointment(appointment_id):
+    """Serialize appointment changes and continuity submissions on their scoped patient."""
+    patient = db.session.scalar(patient_scope().where(Patient.id.in_(
+        select(Appointment.patient_id).where(Appointment.id == appointment_id))).with_for_update())
+    if not patient:
+        abort(404)
+    appointment = db.session.scalar(select(Appointment).where(
+        Appointment.id == appointment_id, Appointment.patient_id == patient.id).with_for_update())
+    if not appointment:
+        abort(404)
+    return patient, appointment
 
 
 @bp.get('/med')
@@ -20,12 +34,13 @@ def dashboard():
     if not g.membership or g.membership.institution.kind != 'medical':
         return render_template('institutions/unavailable.html')
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    stats, latest, admitted = statistics(patients)
+    stats, latest, admitted = statistics(patients,include_admissions=g.membership.role!='dr_assist')
     ids = [p.id for p in patients]
     now = utcnow()
     appointments = list(db.session.scalars(select(Appointment).where(Appointment.patient_id.in_(ids),
         Appointment.status == 'scheduled', Appointment.starts_at >= now).order_by(Appointment.starts_at).limit(8)))
     reminders = [a for a in appointments if a.starts_at <= now + timedelta(days=7)]
+    audit_views('appointment', appointments)
     titles = {'dr': 'Your practice, at a glance', 'nurse': 'Your care dashboard',
               'dr_assist': 'Keep the day running smoothly', 'admin': 'Your practice overview',
               'patient': 'A little clarity for your next step'}
@@ -37,10 +52,11 @@ def dashboard():
 @require_roles(*STAFF)
 def patients():
     rows = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    stats, latest, admitted = statistics(rows)
+    stats, latest, admitted = statistics(rows,include_admissions=g.membership.role!='dr_assist')
     q = request.args.get('q', '').strip().lower()[:100]
     if q:
         rows = [p for p in rows if q in p.name.lower() or q in (p.email or '').lower()]
+    audit_views('patient', rows)
     return render_template('medical/patients.html', patients=rows, latest=latest,
         admitted=admitted, now=utcnow(), cutoff=utcnow()-timedelta(days=90), q=q,
         doctors=doctors(g.membership.institution_id))
@@ -78,7 +94,7 @@ def patient_detail(patient_id):
     patient = accessible_patient(patient_id)
     appointments = list(db.session.scalars(select(Appointment).where(
         Appointment.patient_id == patient.id).order_by(Appointment.starts_at.desc())))
-    admissions = list(db.session.scalars(select(Admission).where(
+    admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
         Admission.patient_id == patient.id).order_by(Admission.admitted_at.desc())))
     audit('view', 'patient', patient.id)
     db.session.commit()
@@ -115,55 +131,81 @@ def assign_nurse(patient_id):
 def appointments():
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
     query = select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]))
+    if g.membership.role=='dr_assist':
+        query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
     rows = list(db.session.scalars(query.order_by(Appointment.starts_at.desc())))
-    return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES)
+    audit_views('appointment', rows)
+    from models import AppointmentProposal
+    proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
+    return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES,proposals=proposals)
 
 
 @bp.post('/med/appointments')
 @require_roles(*SCHEDULERS)
 def create_appointment():
     patient = accessible_patient(request.form.get('patient_id', type=int))
+    from scheduling_services import lock_doctor, validate_slot, history
+    lock_doctor(patient.doctor_id,patient.institution_id)
     try:
-        starts = parse_local(request.form.get('starts_at', ''))
-        if starts <= utcnow() or starts.minute != 0 or starts.second != 0:
-            raise ValueError()
-        service = request.form.get('service', '')
-        if service not in SERVICES:
-            raise ValueError()
-    except (ValueError, TypeError):
-        flash('Choose a future date, an hourly slot (e.g. 10:00), and a listed service.', 'error')
-        return redirect(url_for('med.appointments'))
-    appointment = Appointment(patient_id=patient.id, doctor_id=patient.doctor_id,
-        starts_at=starts, service=service, status='scheduled')
-    db.session.add(appointment)
-    try:
-        db.session.flush()
-        audit('schedule', 'appointment', appointment.id)
-        db.session.commit()
-        flash('Appointment scheduled. An in-app reminder appears during the preceding seven days.', 'success')
-    except IntegrityError:
+        starts=parse_local(request.form.get('starts_at',''))
+        care=request.form.get('care_type','outpatient');kind=request.form.get('visit_kind','followup')
+        service=request.form.get('service','')
+        if service not in SERVICES:raise ValueError('Choose a listed service.')
+        slot=validate_slot(patient,starts,care,kind)
+        appointment=Appointment(institution_id=patient.institution_id,patient_id=patient.id,doctor_id=patient.doctor_id,starts_at=starts,
+            ends_at=slot[1],occupied_until=slot[2],care_type=care,visit_kind=kind,service=service,status='scheduled')
+        db.session.add(appointment);db.session.flush()
+        history(appointment,'scheduled',new=starts)
+        from scheduling_services import refresh_reminders
+        refresh_reminders(appointment)
+        audit('schedule','appointment',appointment.id);db.session.commit()
+        flash('Appointment scheduled. In-app reminders use the confirmed time.','success')
+    except (ValueError,TypeError,IntegrityError) as error:
         db.session.rollback()
-        flash('That patient or doctor already has this slot. Choose another time.', 'error')
+        flash(str(error) if isinstance(error,ValueError) else 'This slot is unavailable.','error')
     return redirect(url_for('med.appointments'))
 
 
 @bp.post('/med/appointments/<int:appointment_id>/status')
 @require_roles(*SCHEDULERS)
 def appointment_status(appointment_id):
-    appointment = db.session.get(Appointment, appointment_id)
-    if not appointment:
-        abort(404)
-    accessible_patient(appointment.patient_id)
+    from .calendar import scoped_appointment
+    patient, appointment = scoped_appointment(appointment_id)
     status = request.form.get('status')
     if status not in ('scheduled', 'completed', 'cancelled', 'no_show'):
         abort(400)
-    if g.membership.role == 'dr_assist' and (status not in ('scheduled', 'cancelled') or appointment.status in ('completed', 'no_show')):
+    if g.membership.role == 'dr_assist' and (status != 'cancelled' or appointment.status != 'scheduled' or appointment.starts_at <= utcnow()):
         abort(403)
     if status in ('completed', 'no_show') and appointment.starts_at > utcnow():
         flash('A future appointment cannot be marked completed or missed.', 'error')
         return redirect(url_for('med.appointments'))
+    if status in ('scheduled','cancelled') and appointment.status!=status:
+        if request.form.get('version',type=int)!=appointment.schedule_version:abort(409)
+        if status=='scheduled':abort(403)  # use the shared booking engine to create a new booking
+    old_status = appointment.status
     appointment.status = status
+    if old_status!=status:
+        from scheduling_services import history,refresh_reminders
+        appointment.schedule_version+=1
+        history(appointment,'status_'+status,old=appointment.starts_at,reason=request.form.get('reason','')[:240])
+        if status=='cancelled':
+            from models import AppointmentProposal
+            for proposal in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,AppointmentProposal.state=='pending')):
+                proposal.state='superseded';proposal.responded_at=utcnow()
+            refresh_reminders(appointment)
     try:
+        db.session.flush()
+        if status == 'no_show':
+            plan = current_plan(patient)
+            if plan and 'missed_appointment' in plan.rules:
+                try:
+                    record_event(patient, 'missed_appointment', 'Appointment marked missed by staff.',
+                                 'appointment:%s' % appointment.id, appointment)
+                except ValueError as error:
+                    flash(str(error), 'error')
+        elif status != old_status:
+            archive_events(patient, ('missed_appointment', 'unconfirmed_booking', 'failed_reminder'),
+                           'Appointment status updated to %s.' % status, appointment.id)
         audit('status_'+status, 'appointment', appointment.id)
         db.session.commit()
     except IntegrityError:
@@ -172,12 +214,32 @@ def appointment_status(appointment_id):
     return redirect(url_for('med.appointments'))
 
 
+@bp.post('/med/appointments/<int:appointment_id>/reschedule')
+@require_roles(*SCHEDULERS)
+def reschedule_appointment(appointment_id):
+    from .calendar import scoped_appointment
+    from scheduling_services import change
+    patient, appointment = scoped_appointment(appointment_id)
+    # Direct changes require explicit staff confirmation; ordinary suggestions are proposals.
+    if request.form.get('confirmed')!='yes':abort(400)
+    reason=request.form.get('reason','').strip()
+    if not reason or len(reason)>240:abort(400)
+    try:
+        change(appointment,patient,parse_local(request.form.get('starts_at','')),
+            request.form.get('version',type=int),reason)
+        audit('reschedule','appointment',appointment.id);db.session.commit()
+    except (ValueError,TypeError,IntegrityError):
+        db.session.rollback();flash('This slot is unavailable. The original appointment was preserved.','error')
+    return redirect(url_for('med.calendar'))
+
+
 @bp.get('/med/admissions')
-@require_roles(*STAFF)
+@require_capability('admissions')
 def admissions():
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
     rows = list(db.session.scalars(select(Admission).where(Admission.patient_id.in_(
         [p.id for p in patients])).order_by(Admission.admitted_at.desc())))
+    audit_views('admission', rows)
     return render_template('medical/admissions.html', admissions=rows, patients=patients)
 
 
@@ -203,12 +265,21 @@ def admit():
 @bp.post('/med/admissions/<int:admission_id>/discharge')
 @require_roles('dr', 'nurse', 'admin')
 def discharge(admission_id):
-    row = db.session.get(Admission, admission_id)
+    row = db.session.scalar(select(Admission).where(Admission.id==admission_id,
+        Admission.patient_id.in_(patient_scope().with_only_columns(Patient.id))))
     if not row:
         abort(404)
-    accessible_patient(row.patient_id)
+    patient=accessible_patient(row.patient_id)
+    from coordination_services import lock_patient, ensure_discharge, record_history
+    lock_patient(patient.id)
+    row=db.session.scalar(select(Admission).where(Admission.id==admission_id,
+        Admission.patient_id==patient.id).with_for_update().execution_options(populate_existing=True))
     if row.discharged_at is None:
         row.discharged_at = utcnow()
+        followup=ensure_discharge(row,patient)
+        if followup.due_at and followup.due_at<row.discharged_at:
+            followup.planning_complete=False
+        record_history('discharge_followup',followup,'actual_discharge_recorded')
         audit('discharge', 'admission', row.id)
         db.session.commit()
     return redirect(url_for('med.admissions'))

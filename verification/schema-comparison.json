@@ -1,0 +1,50 @@
+{
+  "live_schema": "ramosolo",
+  "migration_scripts_target": "lesonto",
+  "live_versions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "new_or_local_tables_absent_from_live": [
+    "care_plans",
+    "clinical_records",
+    "continuity_events",
+    "continuity_history",
+    "continuity_notifications",
+    "external_practitioners",
+    "nursing_observations",
+    "patient_permissions",
+    "patient_preferences"
+  ],
+  "live_tables_not_modeled_by_checkout": [
+    "appointment_attendance_events",
+    "appointment_confirmation_requests",
+    "attendance_followup_reviews",
+    "attendance_followups",
+    "availability_exceptions",
+    "availability_policies",
+    "availability_sessions",
+    "booking_rate_limits",
+    "calendar_blocks",
+    "communication_preferences",
+    "demo_datasets",
+    "followup_policies",
+    "in_app_notifications",
+    "medical_invoices",
+    "medical_payment_entries",
+    "notification_attempts",
+    "notification_outbox",
+    "public_holidays",
+    "reminder_leads",
+    "reminder_policies",
+    "schema_versions"
+  ],
+  "unmodeled_required_appointment_columns_without_defaults": [
+    "institution_id"
+  ],
+  "scope": "Metadata compatibility only; live triggers, runtime credentials and live record contents not inspected."
+}
