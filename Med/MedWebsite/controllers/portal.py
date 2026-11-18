@@ -95,6 +95,7 @@ def patient_detail(patient_id):
     appointments = list(db.session.scalars(select(Appointment).where(
         Appointment.patient_id == patient.id).order_by(Appointment.starts_at.desc())))
     admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
+    admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
         Admission.patient_id == patient.id).order_by(Admission.admitted_at.desc())))
     audit('view', 'patient', patient.id)
     db.session.commit()
@@ -133,7 +134,13 @@ def appointments():
     query = select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]))
     if g.membership.role=='dr_assist':
         query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
+    if g.membership.role=='dr_assist':
+        query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
     rows = list(db.session.scalars(query.order_by(Appointment.starts_at.desc())))
+    audit_views('appointment', rows)
+    from models import AppointmentProposal
+    proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
+    return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES,proposals=proposals)
     audit_views('appointment', rows)
     from models import AppointmentProposal
     proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
@@ -144,6 +151,8 @@ def appointments():
 @require_roles(*SCHEDULERS)
 def create_appointment():
     patient = accessible_patient(request.form.get('patient_id', type=int))
+    from scheduling_services import lock_doctor, validate_slot, history
+    lock_doctor(patient.doctor_id,patient.institution_id)
     from scheduling_services import lock_doctor, validate_slot, history
     lock_doctor(patient.doctor_id,patient.institution_id)
     try:
@@ -166,6 +175,7 @@ def create_appointment():
     except (ValueError,TypeError,IntegrityError) as error:
         db.session.rollback()
         flash(str(error) if isinstance(error,ValueError) else 'This slot is unavailable.','error')
+        flash(str(error) if isinstance(error,ValueError) else 'This slot is unavailable.','error')
     return redirect(url_for('med.appointments'))
 
 
@@ -174,9 +184,12 @@ def create_appointment():
 def appointment_status(appointment_id):
     from .calendar import scoped_appointment
     patient, appointment = scoped_appointment(appointment_id)
+    from .calendar import scoped_appointment
+    patient, appointment = scoped_appointment(appointment_id)
     status = request.form.get('status')
     if status not in ('scheduled', 'completed', 'cancelled', 'no_show'):
         abort(400)
+    if g.membership.role == 'dr_assist' and (status != 'cancelled' or appointment.status != 'scheduled' or appointment.starts_at <= utcnow()):
     if g.membership.role == 'dr_assist' and (status != 'cancelled' or appointment.status != 'scheduled' or appointment.starts_at <= utcnow()):
         abort(403)
     if status in ('completed', 'no_show') and appointment.starts_at > utcnow():
@@ -186,7 +199,33 @@ def appointment_status(appointment_id):
         if request.form.get('version',type=int)!=appointment.schedule_version:abort(409)
         if status=='scheduled':abort(403)  # use the shared booking engine to create a new booking
     old_status = appointment.status
+    if status in ('scheduled','cancelled') and appointment.status!=status:
+        if request.form.get('version',type=int)!=appointment.schedule_version:abort(409)
+        if status=='scheduled':abort(403)  # use the shared booking engine to create a new booking
+    old_status = appointment.status
     appointment.status = status
+    if old_status!=status:
+        from scheduling_services import history,refresh_reminders
+        appointment.schedule_version+=1
+        history(appointment,'status_'+status,old=appointment.starts_at,reason=request.form.get('reason','')[:240])
+        if status=='cancelled':
+            from models import AppointmentProposal
+            for proposal in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,AppointmentProposal.state=='pending')):
+                proposal.state='superseded';proposal.responded_at=utcnow()
+            refresh_reminders(appointment)
+    try:
+        db.session.flush()
+        if status == 'no_show':
+            plan = current_plan(patient)
+            if plan and 'missed_appointment' in plan.rules:
+                try:
+                    record_event(patient, 'missed_appointment', 'Appointment marked missed by staff.',
+                                 'appointment:%s' % appointment.id, appointment)
+                except ValueError as error:
+                    flash(str(error), 'error')
+        elif status != old_status:
+            archive_events(patient, ('missed_appointment', 'unconfirmed_booking', 'failed_reminder'),
+                           'Appointment status updated to %s.' % status, appointment.id)
     if old_status!=status:
         from scheduling_services import history,refresh_reminders
         appointment.schedule_version+=1
@@ -236,12 +275,33 @@ def reschedule_appointment(appointment_id):
     return redirect(url_for('med.calendar'))
 
 
+@bp.post('/med/appointments/<int:appointment_id>/reschedule')
+@require_roles(*SCHEDULERS)
+def reschedule_appointment(appointment_id):
+    from .calendar import scoped_appointment
+    from scheduling_services import change
+    patient, appointment = scoped_appointment(appointment_id)
+    # Direct changes require explicit staff confirmation; ordinary suggestions are proposals.
+    if request.form.get('confirmed')!='yes':abort(400)
+    reason=request.form.get('reason','').strip()
+    if not reason or len(reason)>240:abort(400)
+    try:
+        change(appointment,patient,parse_local(request.form.get('starts_at','')),
+            request.form.get('version',type=int),reason)
+        audit('reschedule','appointment',appointment.id);db.session.commit()
+    except (ValueError,TypeError,IntegrityError):
+        db.session.rollback();flash('This slot is unavailable. The original appointment was preserved.','error')
+    return redirect(url_for('med.calendar'))
+
+
 @bp.get('/med/admissions')
+@require_capability('admissions')
 @require_capability('admissions')
 def admissions():
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
     rows = list(db.session.scalars(select(Admission).where(Admission.patient_id.in_(
         [p.id for p in patients])).order_by(Admission.admitted_at.desc())))
+    audit_views('admission', rows)
     audit_views('admission', rows)
     return render_template('medical/admissions.html', admissions=rows, patients=patients)
 
@@ -270,6 +330,8 @@ def admit():
 def discharge(admission_id):
     row = db.session.scalar(select(Admission).where(Admission.id==admission_id,
         Admission.patient_id.in_(patient_scope().with_only_columns(Patient.id))))
+    row = db.session.scalar(select(Admission).where(Admission.id==admission_id,
+        Admission.patient_id.in_(patient_scope().with_only_columns(Patient.id))))
     if not row:
         abort(404)
     patient=accessible_patient(row.patient_id)
@@ -277,8 +339,17 @@ def discharge(admission_id):
     lock_patient(patient.id)
     row=db.session.scalar(select(Admission).where(Admission.id==admission_id,
         Admission.patient_id==patient.id).with_for_update().execution_options(populate_existing=True))
+    patient=accessible_patient(row.patient_id)
+    from coordination_services import lock_patient, ensure_discharge, record_history
+    lock_patient(patient.id)
+    row=db.session.scalar(select(Admission).where(Admission.id==admission_id,
+        Admission.patient_id==patient.id).with_for_update().execution_options(populate_existing=True))
     if row.discharged_at is None:
         row.discharged_at = utcnow()
+        followup=ensure_discharge(row,patient)
+        if followup.due_at and followup.due_at<row.discharged_at:
+            followup.planning_complete=False
+        record_history('discharge_followup',followup,'actual_discharge_recorded')
         followup=ensure_discharge(row,patient)
         if followup.due_at and followup.due_at<row.discharged_at:
             followup.planning_complete=False

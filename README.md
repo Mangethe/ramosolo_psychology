@@ -95,8 +95,55 @@ actor, institution, resource ID, action and timestamp, without clinical content.
 SQL parameter logging is suppressed, including exception parameter rendering.
 Clinical history remains in its protected clinical records rather than activity logs.
 
+| Operational patient/contact records | Assigned | Assigned | Active supervisor's patients | Own appointments | Current institution |
+| Bookings and administrative follow-ups | Assigned | View; complete own assigned tasks | Supervisor's cohort | Own appointments only | Current institution |
+| Admissions/facilities operations | Assigned | Assigned | No admission history | No | Current institution |
+| Diagnose, author clinical notes/events/plans | Assigned clinician only | Never | Never | Never | Never |
+| Care-plan and concern/clinical-event reading | Assigned | Separate clinician grant per resource/patient | No | Approved patient-facing plan only | Separate clinician grant per resource/patient |
+| Diagnosis/clinical-note reading | Assigned | Separate clinician grant per resource/patient | No | No internal records | Separate clinician grant per resource/patient |
+| Psychotherapy notes | Assigned | No | No | No | Separate explicit grant |
+| Nursing observations | Read assigned | Author/read own; other observations require grant | No | No | Separate explicit grant |
+| Clinical task acknowledgment/completion/escalation | Assigned | Read grant plus task ownership | No | No | No; clinical grants are read-only |
+| Patient check-ins/preferences | Review assigned concerns | Concern read grant required | No | Own, optional; never clinician-confirmed automatically | Concern read grant required |
+| Grant/revoke patient permissions | Assigned clinician only | No | No | No | No |
+| Exports | Assigned records | No | No | No | Explicit export grant plus resource read permission |
+| Accounts and operational administration | No | No | No | No | Current institution |
+
+The executable matrix and deny-by-default resource scopes are in `access.py`.
+**Roles & permissions** is available in the portal before opening care modules.
+An admin's institution-wide operational access does not grant clinical reading.
+Clinical resources have separate scopes; a clinical read grant never grants
+clinical authorship. Unknown roles, permissions, record types and export resources
+fail closed. There is no global superadmin web account.
+
+From an assigned patient, the clinician opens **Explicit patient permissions**
+and grants or revokes individual resources for an active admin or assigned nurse.
+Permissions bind institution, patient, active membership and current treating
+clinician. A disabled authorizing clinician, changed treating doctor, revoked
+membership, revoked grant or removed nursing assignment removes the corresponding
+access on the next request. Account administrators cannot issue these grants.
+Doctor assistants and patients cannot receive internal clinical grants.
+
+Nurses need an explicit clinical-resource read grant and must own a follow-up to
+change its clinical task status. After escalation transfers ownership to the
+clinician, that nurse can no longer complete the task. Nursing observations and
+escalation flags remain separate records; they never create diagnoses or clinical
+events. Diagnoses, clinical notes and psychotherapy notes are append-only records
+requiring the assigned clinician's explicit authorship confirmation.
+
+Sensitive views, chart totals/drill-downs and POST-only CSV exports use the same
+patient/resource scopes. Admin exports require a separate patient-specific
+`export` grant as well as each clinical read grant. Operational exports include
+contact fields only. CSV formula-like values are escaped. Activity records store
+actor, institution, resource ID, action and timestamp, without clinical content.
+SQL parameter logging is suppressed, including exception parameter rendering.
+Clinical history remains in its protected clinical records rather than activity logs.
+
 Institution creation and verified cross-institution membership are owner CLI
 operations. Suspending a membership removes that institution's access without
+suspending unrelated memberships. A disabled doctor supervisor removes the
+assistant's patient scope. Nurses require explicit care assignments; assignment
+alone issues no clinical grant.
 suspending unrelated memberships. A disabled doctor supervisor removes the
 assistant's patient scope. Nurses require explicit care assignments; assignment
 alone issues no clinical grant.
@@ -123,6 +170,87 @@ routes. No learner records or education workflows are implemented.
 - Account provisioning/suspension, nursing assignments, institution switching and
   a basic activity log for mutations and individual staff patient-record views.
 
+### Supportive care continuity
+
+The medical navigation now includes a **Follow-up queue** for staff and an
+**Optional check-in** page for patients. Doctors open **Care plan** from an
+assigned patient or the queue. Only the assigned doctor authors and approves
+plan versions. Assigned nurses and admins need explicit patient-specific read
+grants for each clinical resource. Doctor assistants see administrative follow-ups
+only. Patients cannot open staff queues or internal care-plan records. The clinician
+can explicitly publish the agreed patient-facing plan; its SQL projection omits
+internal definitions, clinical-event rules, diagnoses, notes and staff history.
+The latest plan must be published; old versions are not shown as a substitute.
+Patients can separately record their contact/consent preferences. Declining consent
+or removing a channel restricts sandbox previews immediately and does not change
+appointments or treatment. New channels do not broaden the clinician-agreed consent.
+
+External treating psychiatrists are patient-scoped **references**, managed by the
+assigned clinician and readable only through the corresponding clinical scope.
+Recording their name, contact and registration reference creates no login account,
+membership, invitation or notification.
+
+Each plan records patient-agreed goals and individual warning signs, preferred
+channels and an explicit communication-consent choice, planned appointments,
+review date, an enabled assigned clinical owner, response/escalation steps,
+practice-approved urgent-help instructions, actual monitoring hours (including
+time zone and holiday arrangements), and the practice's clinical definitions.
+Saving requires the clinician's attestation of patient agreement and practice
+approval. Earlier versions remain available. No practice hours, definitions,
+urgent-help wording or response times are invented or seeded.
+
+Enter an approved response time for each enabled event rule. Blank means
+disabled. Times are **elapsed minutes from event recording**, including outside
+monitoring hours; clinicians must choose values matching the agreed service.
+Existing follow-ups retain their original deadline and plan snapshot when a new
+plan is agreed. Updating the plan does not silently change an existing task's
+owner, treatment or response time; staff can explicitly reassign an active task.
+
+Three separate event categories are stored and constrained in the database:
+
+- **Administrative:** missed appointment, unconfirmed booking, failed reminder,
+  overdue follow-up. A staff no-show update opens a missed-appointment follow-up
+  only if the current plan enables it. Other administrative events are recorded
+  explicitly; appointment references must belong to the scoped patient, and an
+  overdue review requires the plan's review date to have passed. Unconfirmed
+  booking and failed reminder records are staff observations, not inferred delivery
+  failures. Unlinked public booking enquiries remain in the admin booking inbox.
+- **Patient-reported:** optional contact request or agreed check-in. Patients see
+  only practice-entered monitoring hours and urgent-help instructions before
+  submission, with an explicit notice that submissions are not continuously
+  monitored. Without an enabled agreed rule, submissions remain unavailable.
+- **Clinical:** deterioration, lapse or relapse, explicitly entered by the
+  assigned doctor with confirmation that the practice's recorded definitions
+  apply. Administrative events never generate a clinical event or diagnosis.
+
+Active alerts are deduplicated by patient, event kind and source. Additional
+patient and clinician reports append history without postponing the deadline.
+The queue shows owner, due time, reason and state. Staff record acknowledgment,
+contact attempts (including channel/result), outcomes, agreed escalation,
+assignment, closure and archiving, with actor and timestamp history. Overdue
+tasks are highlighted for staff review. There is no background monitoring worker
+or automatic escalation; the practice must staff the queue during the entered
+hours. Closure/archive history is a separate queue view.
+
+Explicit appointment status resolution and rescheduling archive linked obsolete
+administrative alerts. Rescheduling preserves the original appointment and
+creates a replacement atomically; conflicting slots roll back the change.
+A newly agreed plan archives obsolete review-date alerts. No continuity rule
+cancels care, changes treatment or restricts portal access.
+
+**Notifications are sandbox previews only.** No external delivery adapter, real
+message sending or recipient address is used. A preview requires the latest
+plan's communication consent and an agreed channel, uses fixed neutral wording,
+omits diagnoses and patient content, and is deduplicated per event/channel.
+No automated diagnosis, medication recommendation or risk probability is provided.
+
+The current protected `ramosolo` schema already has versions **1–6**. The proposed
+forward path is **007 → 008**, described below. Files 001–003 remain historical
+new-database/test fixtures; **do not apply 002/003 to the existing ramosolo ledger**
+or rename them as an upgrade. No live migration is applied automatically.
+
+These workflows are a development prototype and require practitioner and
+operational review; no clinical effectiveness or production readiness is claimed.
 ### Supportive care continuity
 
 The medical navigation now includes a **Follow-up queue** for staff and an
@@ -282,6 +410,7 @@ auth.py                       Login and logout
 administration.py             Users, roles, requests, institutions, activity
 medical_services.py           Counts, time conversion, service options
 continuity_services.py        Approved continuity rules, deduplication and history
+continuity_services.py        Approved continuity rules, deduplication and history
 cli.py                        Local seed and owner provisioning
 Med/MedWebsite/controllers/    Public and medical routes
 Med/MedWebsite/templates/      Medical views
@@ -289,6 +418,7 @@ Edu/                          Explicit education placeholder
 models/                       Core, RBAC, medical, education placeholder, governance
 templates/                    Shared, auth, users, institutions, admin, public views
 static/css/                   Local stylesheet, no frontend dependencies
+migrations/                   PostgreSQL baseline and care-continuity upgrade
 migrations/                   PostgreSQL baseline and care-continuity upgrade
 tests/                        Automated permissions and behavior checks
 ```

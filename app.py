@@ -114,6 +114,8 @@ def create_app(test_config=None):
         return dict(roles=ROLES, membership=getattr(g, 'membership', None),
                     memberships=getattr(g, 'memberships', []), current_year=datetime.now().year,
                     can_patient=can_patient, capability=capability, official=OFFICIAL_LINKS)
+                    memberships=getattr(g, 'memberships', []), current_year=datetime.now().year,
+                    can_patient=can_patient, capability=capability, official=OFFICIAL_LINKS)
 
     @app.after_request
     def response_headers(response):

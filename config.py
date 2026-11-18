@@ -38,6 +38,8 @@ def settings():
         raise RuntimeError('Production requires PostgreSQL. SQLite is for local demos.')
     if production and os.getenv('FLASK_DEBUG','').lower() not in ('','0','false','no','off'):
         raise RuntimeError('FLASK_DEBUG must be disabled in production.')
+    if production and os.getenv('FLASK_DEBUG','').lower() not in ('','0','false','no','off'):
+        raise RuntimeError('FLASK_DEBUG must be disabled in production.')
     engine = {'pool_pre_ping': True}
     if url.startswith('postgresql+'):
         # Poolers may ignore startup options. The engine checkout hook applies
