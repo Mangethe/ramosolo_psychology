@@ -47,7 +47,7 @@ def occupied_until(appointment):
 
 
 def available_slots(patient, day, care_type='outpatient', visit_kind='followup', exclude=None):
-    if care_type not in ('outpatient','inpatient') or visit_kind not in ('followup','first','assessment'):
+    if care_type not in ('outpatient','inpatient') or visit_kind not in ('followup','routine','first','assessment'):
         raise ValueError('Choose a listed session and visit type.')
     policy=db.session.scalar(select(AvailabilityPolicy).where(
         AvailabilityPolicy.institution_id==patient.institution_id, AvailabilityPolicy.doctor_id==patient.doctor_id,
@@ -82,7 +82,10 @@ def available_slots(patient, day, care_type='outpatient', visit_kind='followup',
         CalendarBlock.starts_at<end,CalendarBlock.ends_at>start)))
     result={}
     for session in sessions:
-        duration={'followup':session.duration_minutes,'first':session.first_minutes,'assessment':session.assessment_minutes}[visit_kind]
+        # Production's booking trigger calls this visit kind "routine". Keep
+        # "followup" as the form/API label and treat both as the same slot type.
+        duration={'followup':session.duration_minutes,'routine':session.duration_minutes,
+            'first':session.first_minutes,'assessment':session.assessment_minutes}[visit_kind]
         if not duration or duration<=0 or session.break_minutes is None or session.break_minutes<5:
             continue
         cursor=utc_on(day,session.opens_at); close=utc_on(day,session.closes_at)
@@ -168,10 +171,15 @@ def change(appointment,patient,starts,expected,reason,proposal=None):
     if expected!=appointment.schedule_version:abort(409)
     slot=validate_slot(patient,starts,appointment.care_type or 'outpatient',appointment.visit_kind or 'followup',appointment.id)
     old=appointment.starts_at
+    # The observed live booking guard accepts "routine". Existing rows created
+    # by older application versions may still contain the UI label "followup";
+    # normalize that value only as part of an explicitly confirmed reschedule.
+    visit_kind='routine' if appointment.visit_kind in (None,'followup','routine') else appointment.visit_kind
     # CAS protects SQLite too; PostgreSQL additionally holds the doctor's row lock.
     result=db.session.execute(update(Appointment).where(Appointment.id==appointment.id,
         Appointment.schedule_version==expected,Appointment.status=='scheduled').values(
-        starts_at=slot[0],ends_at=slot[1],occupied_until=slot[2],schedule_version=expected+1))
+        starts_at=slot[0],ends_at=slot[1],occupied_until=slot[2],visit_kind=visit_kind,
+        schedule_version=expected+1))
     if result.rowcount!=1:abort(409)
     db.session.refresh(appointment)
     history(appointment,'proposal_accepted' if proposal else 'staff_confirmed_change',old,starts,reason,proposal)

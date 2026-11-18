@@ -59,7 +59,7 @@ reported as completed successes. A discharge reassignment autoflush/constraint
 failure and the prior assumption that publication supplied sharing consent were
 corrected before the final run.
 
-## Implemented behavior and safety boundaries
+## Implemented behaviour and safety boundaries
 
 - Discharge follow-up is unique per admission episode. Actual discharge remains
   possible with missing planning; owner/date/policy are mandatory for clinician
@@ -137,9 +137,9 @@ sentinels remain unchanged after 007/008. This is not a staging restore or live
 financial integration test. The checkout still does not contain the full live
 booking/financial/consumer source, including the live required appointment
 institution column. Reconcile that application source and verify consumer
-transaction/retry behavior before deploying a complete application build.
+transaction/retry behaviour before deploying a complete application build.
 Financial runtime, Supabase PostgreSQL 17 execution, backup restore and live
-transport behavior remain **unverified**. Local PostgreSQL used version 18.
+transport behaviour remain **unverified**. Local PostgreSQL used version 18.
 
 ## Clinician/policy and pre-release decisions
 
@@ -241,7 +241,7 @@ metadata only.
 
 ## Scenario acceptance matrix
 
-| Requested case | Verified behavior | Remaining gap / verdict |
+| Requested case | Verified behaviour | Remaining gap / verdict |
 | --- | --- | --- |
 | Multiple confirmed/provisional diagnoses and amended histories | Four separate synthetic diagnosis texts can coexist without rewriting prior rows | **Not structurally implemented:** confirmation status, provisional status, severity and amendment/supersession linkage are free text; no validated current-diagnosis history/filter |
 | Missing severity | Generic records do not invent a numeric severity | **Not implemented:** no structured unknown/missing severity field or corresponding reporting denominator |
@@ -277,7 +277,7 @@ EXISTS-filtered sum correctly returned **150**. This is an aggregation reference
 and negative control, **not** a test of an application financial query. This
 checkout has no invoice/payment ORM or financial reports to inspect. Its export
 resource allowlist does not expose the live invoice/payment tables. Existing
-live financial behavior, currency/refund semantics and diagnosis-filtered
+live financial behaviour, currency/refund semantics and diagnosis-filtered
 financial totals remain **unverified**. Clinical and financial report endpoints,
 permissions and output schemas must remain separate when the live modules are
 reconciled; do not infer financial correctness from clinical test passes.
@@ -318,7 +318,7 @@ Authorization filtering alone is not statistical de-identification.
 **Export-filter defect:** `patient_id=0` parses as zero, then the truthiness check
 at `Med/MedWebsite/controllers/permissions.py:236` skips the requested patient
 filter. The response can export all otherwise-authorized patients. It does not
-bypass resource/institution grants, but the requested selection is not honored.
+bypass resource/institution grants, but the requested selection is not honoured.
 Reject invalid/non-positive IDs before constructing any export.
 
 Audit checks confirm record IDs, actor, institution, action and timestamps,
@@ -367,7 +367,7 @@ No real data was altered, packaged or included in these evidence artifacts.
 7. **Practice operation:** clinician approval of actual monitoring hours, response
    times, warning signs, escalation steps, communication consent and urgent-help
    wording remains necessary; synthetic examples supply no practitioner approval.
-8. **Release QA:** desktop/mobile, keyboard/screen-reader behavior, live-version
+8. **Release QA:** desktop/mobile, keyboard/screen-reader behaviour, live-version
    staging migration, backup restore, live transport contracts and remaining
    concurrency cases remain unverified. No clinical or production readiness is
    established by the test results.
@@ -563,7 +563,7 @@ details were removed and confirmation remains required before publication.
 Practice/HPCSA numbers remain separate pending facts. No operating hours invented.
 
 Unverified: physical devices, Safari/Firefox, screen-reader announcements, exact
-missing-reference fidelity and production HTTPS/CDN/proxy behavior. The linked
+missing-reference fidelity and production HTTPS/CDN/proxy behaviour. The linked
 privacy information remains a draft, pending practice-approved notices in the next
 phase. No deployment, live migration, grant/RLS change or real communication occurred.
 `git diff --check -- . ':!node_modules'` passed with only CRLF notices.
@@ -639,3 +639,24 @@ migration, infrastructure, grant/RLS or regulatory change occurred.
 [Owner approval/evidence checklist](docs/privacy-owner-checklist.md),
 [application/infrastructure evidence](verification/policy-evidence.json) and the
 pages keep unresolved policy decisions separate from implemented behaviour.
+
+## Booking/login bundle application — 17 November 2026
+
+Reviewed and applied `booking-login-fix/booking-login-fix.patch` after a successful
+`git apply --check`. All six applied files match the supplied replacements.
+Existing/concurrent local ignore-file changes and the extracted bundle were left
+untouched. Updated schema-default documentation and restricted pytest discovery
+to application `tests` to avoid collecting duplicate reference-bundle tests.
+
+Full synthetic suite: **241 passed, 0 failed, 0 skipped, 3 xfailed, 6 warnings in
+414.01s**. Bundle module: **14 passed in 9.49s** (included in the full count).
+Isolated Chrome: **45 checks passed**, zero external page requests. Standalone
+read-only diagnostic against intentionally empty in-memory SQLite correctly
+returned exit 1 with missing objects; initialized synthetic CLI checks passed.
+The first full attempt stopped with one duplicate-reference collection error;
+this was resolved by `pytest.ini`, without excluding application tests.
+
+Exact commands, patch hash, limitations and preserved changes:
+[booking/login review](verification/booking-login-fix-review.md).
+No protected credential file, actual patient/database file or real account was
+read/tested. No live database change, service restart, migration, seed or deployment.

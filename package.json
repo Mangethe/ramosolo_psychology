@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "supabase": "^3.2.0"
+  },
+  "dependencies": {
+    "fastai": "^1.0.0",
+    "geoplot": "^1.1.19"
+  }
+}

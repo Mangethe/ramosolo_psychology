@@ -234,7 +234,9 @@ The original `.env` was deliberately not read or copied. The original
    SQLAlchemy uses `postgresql+psycopg://`; ordinary `postgresql://` URLs are also
    normalized. URL-encode password characters and configure SSL. For server
    identity verification use `sslmode=verify-full` and the appropriate root certificate.
-4. `DB_SCHEMA` defaults to `lesonto` and must match the applied migration. Use a
+4. `DB_SCHEMA` now defaults to `ramosolo` and must match the applied migration.
+   Set `DB_SCHEMA=lesonto` explicitly for the historical baseline described above;
+   do not replay it on existing hosted data. Use a
    dedicated runtime database role with only required DML/sequence privileges,
    separate from the migration owner; do not expose its password to a browser.
 5. Set a random `FLASK_SECRET_KEY` of at least 32 characters. Production requires
@@ -607,3 +609,10 @@ The [official-link report](verification/policy-official-links.json) records six
 successful Regulator URLs and three unverified HPCSA connections. Recheck with
 `python verification/check_official_policy_links.py`; this sends public GETs only,
 without credentials, records, cookies or regulatory submissions.
+
+## Booking/login configuration fix
+
+See [database entry-point diagnostics](docs/database-entry-points.md).
+`DATABASE_URL` takes precedence over `SUPABASE_DB_URL`; the PostgreSQL schema
+default is now `ramosolo`. The connection checker is read-only and does not apply
+migrations or initialize missing objects.

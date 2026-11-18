@@ -1,0 +1,7 @@
+{
+  "profile": "synthetic-ramosolo-live-catalog-on-edb-postgresql-17.11",
+  "server_version_num": 170011,
+  "constraint_fingerprint": "0ecc63c7f166d59e8d2a4c94de7aa685",
+  "definition_render_differences": 18,
+  "reason": "The fixture executes the reviewed production pg_get_constraintdef text as DDL; the isolated EDB PostgreSQL 17.11 build re-renders 18 equivalent CHECK expressions with different redundant parentheses and varchar-to-text array casts. The production snapshot fingerprint remains a separate required profile."
+}

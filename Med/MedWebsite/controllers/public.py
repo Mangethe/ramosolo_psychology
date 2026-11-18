@@ -49,8 +49,10 @@ def inpatient():
 
 @bp.route('/book', methods=['GET', 'POST'])
 def book():
-    institution = public_institution()
     if request.method == 'POST':
+        # Rendering a public enquiry form does not require a database. Resolve
+        # the destination only when accepting a request.
+        institution = public_institution()
         if not institution:
             flash('Online requests are not configured yet. Please contact the practice directly.', 'error')
             return redirect(url_for('med.book'))

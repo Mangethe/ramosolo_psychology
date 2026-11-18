@@ -5,6 +5,7 @@ from flask import render_template, g, request, redirect, url_for, session
 from dotenv import load_dotenv
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from extensions import db, login_manager, csrf
 from config import settings
 from security import SecureFlask, configure_security
@@ -15,6 +16,19 @@ def sqlite_foreign_keys(connection, _):
     if connection.__class__.__module__.startswith('sqlite3'):
         cursor = connection.cursor()
         cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.close()
+
+
+def postgres_schema_on_checkout(dbapi_connection, connection_record, connection_proxy):
+    """Reset pooled PostgreSQL connections to this app's validated schema."""
+    schema = connection_record.info.get('ramosolo_schema')
+    if not schema:
+        return
+    cursor = dbapi_connection.cursor()
+    try:
+        # Identifier was validated as lowercase [a-z][a-z0-9_]* in config.
+        cursor.execute(f'SET SESSION search_path TO "{schema}", public')
+    finally:
         cursor.close()
 
 
@@ -31,6 +45,17 @@ def create_app(test_config=None):
     app.config['SQLALCHEMY_ECHO'] = False
     os.makedirs(app.instance_path, exist_ok=True)
     db.init_app(app)
+    if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('postgresql+'):
+        schema = app.config.get('DB_SCHEMA', '')
+        import re
+        if not re.fullmatch(r'[a-z][a-z0-9_]*', schema):
+            raise RuntimeError('DB_SCHEMA must be a lowercase SQL identifier.')
+        with app.app_context():
+            engine = db.engine
+            @event.listens_for(engine, 'connect')
+            def tag_postgres_connection(dbapi_connection, connection_record):
+                connection_record.info['ramosolo_schema'] = schema
+            event.listen(engine, 'checkout', postgres_schema_on_checkout)
     login_manager.init_app(app)
     csrf.init_app(app)
     login_manager.login_view = 'auth.login'
@@ -61,6 +86,8 @@ def create_app(test_config=None):
 
     @login_manager.user_loader
     def load_user(user_id):
+        if getattr(g, 'database_unavailable', False):
+            return None
         from security import valid_login_clock
         if not valid_login_clock(app):
             # Flask-Login can otherwise restore an old remember cookie after
@@ -91,8 +118,33 @@ def create_app(test_config=None):
     @app.after_request
     def response_headers(response):
         if response.status_code >= 400:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except SQLAlchemyError:
+                # A broken connection must not turn an error response into a
+                # second database exception.
+                db.session.remove()
         return response
+
+    @app.errorhandler(SQLAlchemyError)
+    def database_unavailable(error):
+        g.database_unavailable = True
+        db.session.remove()
+        # No SQL, parameters, connection strings or exception messages in logs.
+        app.logger.error('Database unavailable type=%s endpoint=%s',
+                         type(error).__name__, request.endpoint or 'unmatched')
+        # Do not render the shared shell: its authentication context may try to
+        # load the same unavailable database while displaying this error.
+        body = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<title>Temporarily unavailable · Ramosolo</title></head><body>'
+                '<main><h1>Temporarily unavailable</h1>'
+                '<p>We cannot reach the practice records right now. '
+                'Please try again later or contact the practice directly.</p>'
+                '<p>If you were submitting a request, do not assume it was saved. '
+                'Confirm with the practice before submitting again.</p>'
+                '<p><a href="/">Return to the practice website</a></p></main></body></html>')
+        return body, 503, {'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '60'}
 
     def portal_error(error):
         from werkzeug.exceptions import SecurityError

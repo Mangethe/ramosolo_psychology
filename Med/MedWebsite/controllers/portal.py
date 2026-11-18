@@ -152,8 +152,11 @@ def create_appointment():
         service=request.form.get('service','')
         if service not in SERVICES:raise ValueError('Choose a listed service.')
         slot=validate_slot(patient,starts,care,kind)
+        # The live booking guard names the follow-up slot kind "routine".
+        # Keep the existing form/API value but persist the live-schema value.
+        stored_kind='routine' if kind=='followup' else kind
         appointment=Appointment(institution_id=patient.institution_id,patient_id=patient.id,doctor_id=patient.doctor_id,starts_at=starts,
-            ends_at=slot[1],occupied_until=slot[2],care_type=care,visit_kind=kind,service=service,status='scheduled')
+            ends_at=slot[1],occupied_until=slot[2],care_type=care,visit_kind=stored_kind,service=service,status='scheduled')
         db.session.add(appointment);db.session.flush()
         history(appointment,'scheduled',new=starts)
         from scheduling_services import refresh_reminders
