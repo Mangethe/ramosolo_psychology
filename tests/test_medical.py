@@ -1,12 +1,12 @@
 import re
-from datetime import timedelta, datetime
+from datetime import datetime, time, timedelta, timezone
 import pytest
 from flask import g
 from sqlalchemy import select
 from app import create_app
 from extensions import db
 from models import User, Institution, Membership, Patient, CareAssignment, Appointment, Admission, BookingRequest, AuditEvent
-from medical_services import utcnow, statistics
+from medical_services import TZ, utcnow, statistics
 
 
 @pytest.fixture
@@ -172,20 +172,58 @@ def test_cancelled_and_no_show_not_seen(env):
     assert statistics([env[2][0]])[0]['active']==0
 
 
-def test_doctor_slot_collision_and_cancelled_reuse(env):
-    client=as_user(env,'dr')
-    p=Patient(name='Same doctor',institution_id=env[2][0].institution_id,doctor_id=env[1]['dr'].id)
-    db.session.add(p);db.session.commit()
-    from test_calendar import approved,local,utc_on,time
-    _,day=approved(env[2][0])
-    env[3][0].starts_at=utc_on(day,time(8));env[3][0].ends_at=utc_on(day,time(8,30));db.session.commit()
-    local=local(env[3][0].starts_at)
-    form={'patient_id':p.id,'starts_at':local,'service':'Individual therapy'}
-    response=client.post('/med/appointments',data=form,follow_redirects=True)
+def test_doctor_slot_collision_and_cancelled_reuse(env, monkeypatch):
+    import scheduling_services
+    import test_calendar
+
+    local_now = datetime(2026, 11, 25, 9, tzinfo=TZ)
+    now = local_now.astimezone(timezone.utc).replace(tzinfo=None)
+    monkeypatch.setattr(scheduling_services, 'utcnow', lambda: now)
+    monkeypatch.setattr(test_calendar, 'utcnow', lambda: now)
+
+    client = as_user(env, 'dr')
+    original = env[3][0]
+    _, day = test_calendar.approved(env[2][0])
+    original.institution_id = env[2][0].institution_id
+    original.starts_at = scheduling_services.utc_on(day, time(8))
+    original.ends_at = original.starts_at + timedelta(hours=1)
+    original.occupied_until = original.ends_at + timedelta(minutes=5)
+    original.care_type = 'outpatient'
+    original.visit_kind = 'first'
+    patient = Patient(name='Same doctor', institution_id=original.institution_id, doctor_id=original.doctor_id)
+    db.session.add(patient)
+    db.session.commit()
+
+    # 08:35 is a follow-up slot that overlaps the existing 08:00 first visit.
+    local_start = datetime.combine(day, time(8, 35), TZ)
+    starts_at = local_start.astimezone(timezone.utc).replace(tzinfo=None)
+    form = {'patient_id': patient.id, 'starts_at': local_start.isoformat(timespec='minutes'),
+            'service': 'Individual therapy'}
+    appointment_count = select(db.func.count(Appointment.id))
+    before = db.session.scalar(appointment_count)
+
+    response = client.post('/med/appointments', data=form, follow_redirects=True)
     assert b'unavailable' in response.data
-    env[3][0].status='cancelled';db.session.commit()
-    response=client.post('/med/appointments',data=form,follow_redirects=True)
+    assert db.session.scalar(appointment_count) == before
+    assert original.status == 'scheduled'
+
+    response = client.post(f'/med/appointments/{original.id}/status',
+                           data={'status': 'cancelled', 'version': original.schedule_version})
+    assert response.status_code == 302
+    db.session.refresh(original)
+    assert original.status == 'cancelled'
+    assert starts_at in {slot[0] for slot in scheduling_services.available_slots(patient, day)}
+
+    response = client.post('/med/appointments', data=form, follow_redirects=True)
     assert b'Appointment scheduled.' in response.data
+    assert db.session.scalar(appointment_count) == before + 1
+    booking = db.session.scalars(select(Appointment).where(Appointment.patient_id == patient.id)).one()
+    assert booking.institution_id == original.institution_id
+    assert booking.doctor_id == original.doctor_id
+    assert booking.starts_at == starts_at
+    assert booking.ends_at == starts_at + timedelta(minutes=30)
+    assert booking.visit_kind == 'routine'
+    assert booking.status == 'scheduled'
 
 
 def test_suspended_membership_stops_existing_session(env):

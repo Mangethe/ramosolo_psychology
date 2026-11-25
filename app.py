@@ -110,10 +110,11 @@ def create_app(test_config=None):
     @app.context_processor
     def shared_context():
         from access import can_patient, capability
-        from policy_info import OFFICIAL_LINKS
+        from policy_info import CARD, OFFICIAL_LINKS
         return dict(roles=ROLES, membership=getattr(g, 'membership', None),
                     memberships=getattr(g, 'memberships', []), current_year=datetime.now().year,
-                    can_patient=can_patient, capability=capability, official=OFFICIAL_LINKS)
+                    can_patient=can_patient, capability=capability, official=OFFICIAL_LINKS,
+                    practice_contact=CARD)
 
     @app.after_request
     def response_headers(response):

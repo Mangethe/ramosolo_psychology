@@ -157,7 +157,8 @@ def create_appointment():
     lock_doctor(patient.doctor_id,patient.institution_id)
     try:
         starts=parse_local(request.form.get('starts_at',''))
-        care=request.form.get('care_type','outpatient');kind=request.form.get('visit_kind','follow-up')
+        care = request.form.get('care_type', 'outpatient')
+        kind = request.form.get('visit_kind', 'followup')
         service=request.form.get('service','')
         if service not in SERVICES:raise ValueError('Choose a listed service.')
         slot=validate_slot(patient,starts,care,kind)
