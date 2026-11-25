@@ -94,7 +94,7 @@ def patient_detail(patient_id):
     patient = accessible_patient(patient_id)
     appointments = list(db.session.scalars(select(Appointment).where(
         Appointment.patient_id == patient.id).order_by(Appointment.starts_at.desc())))
-    admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
+    
     admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
         Admission.patient_id == patient.id).order_by(Admission.admitted_at.desc())))
     audit('view', 'patient', patient.id)
@@ -157,7 +157,7 @@ def create_appointment():
     lock_doctor(patient.doctor_id,patient.institution_id)
     try:
         starts=parse_local(request.form.get('starts_at',''))
-        care=request.form.get('care_type','outpatient');kind=request.form.get('visit_kind','followup')
+        care=request.form.get('care_type','outpatient');kind=request.form.get('visit_kind','follow-up')
         service=request.form.get('service','')
         if service not in SERVICES:raise ValueError('Choose a listed service.')
         slot=validate_slot(patient,starts,care,kind)
@@ -189,7 +189,6 @@ def appointment_status(appointment_id):
     status = request.form.get('status')
     if status not in ('scheduled', 'completed', 'cancelled', 'no_show'):
         abort(400)
-    if g.membership.role == 'dr_assist' and (status != 'cancelled' or appointment.status != 'scheduled' or appointment.starts_at <= utcnow()):
     if g.membership.role == 'dr_assist' and (status != 'cancelled' or appointment.status != 'scheduled' or appointment.starts_at <= utcnow()):
         abort(403)
     if status in ('completed', 'no_show') and appointment.starts_at > utcnow():
@@ -226,53 +225,12 @@ def appointment_status(appointment_id):
         elif status != old_status:
             archive_events(patient, ('missed_appointment', 'unconfirmed_booking', 'failed_reminder'),
                            'Appointment status updated to %s.' % status, appointment.id)
-    if old_status!=status:
-        from scheduling_services import history,refresh_reminders
-        appointment.schedule_version+=1
-        history(appointment,'status_'+status,old=appointment.starts_at,reason=request.form.get('reason','')[:240])
-        if status=='cancelled':
-            from models import AppointmentProposal
-            for proposal in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,AppointmentProposal.state=='pending')):
-                proposal.state='superseded';proposal.responded_at=utcnow()
-            refresh_reminders(appointment)
-    try:
-        db.session.flush()
-        if status == 'no_show':
-            plan = current_plan(patient)
-            if plan and 'missed_appointment' in plan.rules:
-                try:
-                    record_event(patient, 'missed_appointment', 'Appointment marked missed by staff.',
-                                 'appointment:%s' % appointment.id, appointment)
-                except ValueError as error:
-                    flash(str(error), 'error')
-        elif status != old_status:
-            archive_events(patient, ('missed_appointment', 'unconfirmed_booking', 'failed_reminder'),
-                           'Appointment status updated to %s.' % status, appointment.id)
         audit('status_'+status, 'appointment', appointment.id)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         flash('This slot is already booked.', 'error')
     return redirect(url_for('med.appointments'))
-
-
-@bp.post('/med/appointments/<int:appointment_id>/reschedule')
-@require_roles(*SCHEDULERS)
-def reschedule_appointment(appointment_id):
-    from .calendar import scoped_appointment
-    from scheduling_services import change
-    patient, appointment = scoped_appointment(appointment_id)
-    # Direct changes require explicit staff confirmation; ordinary suggestions are proposals.
-    if request.form.get('confirmed')!='yes':abort(400)
-    reason=request.form.get('reason','').strip()
-    if not reason or len(reason)>240:abort(400)
-    try:
-        change(appointment,patient,parse_local(request.form.get('starts_at','')),
-            request.form.get('version',type=int),reason)
-        audit('reschedule','appointment',appointment.id);db.session.commit()
-    except (ValueError,TypeError,IntegrityError):
-        db.session.rollback();flash('This slot is unavailable. The original appointment was preserved.','error')
-    return redirect(url_for('med.calendar'))
 
 
 @bp.post('/med/appointments/<int:appointment_id>/reschedule')

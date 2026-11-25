@@ -31,10 +31,16 @@ PostgreSQL checks use a read-only transaction and bounded statement/connection t
 If missing objects are reported, reconcile the current additive migration plan;
 do not replay baseline migrations, drop tables or use `init-db` on hosted data.
 
-The protected seeding launcher temporarily sets environment variables and restores
-them at exit. A successful launcher does not automatically configure a later web
-server process. Ensure the actual web process receives its own server-side URL and
-`DB_SCHEMA=ramosolo`. Do not share `.env`, URLs or passwords in logs or chat.
+`seed_demo_private.ps1` requires the hosted `seed-demo` and `verify-demo`
+commands. This checkout registers an empty-database SQLite seeder only. The
+hosted prototype in `demo_seed.py` depends on older models and still expects
+schema version 6. A schema upgrade alone cannot make the hosted launcher work.
+For the hosted schema migration, follow the
+[live reconciliation runbook](live-schema-reconciliation-runbook.md).
+
+The protected launcher temporarily sets environment variables and restores them
+at exit. Configure the web server process with its own server-side URL and
+`DB_SCHEMA=ramosolo`. Keep `.env`, URLs and passwords out of logs and chat.
 
 Regression tests cover the Supabase URL alias, schema selection, no-database form
 rendering, safe database failures and recovery-safe login behavior. Live Supabase

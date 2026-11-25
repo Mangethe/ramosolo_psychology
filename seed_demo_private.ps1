@@ -23,8 +23,15 @@ try {
     $env:PYTHON_DOTENV_DISABLED = '1'
     Push-Location -LiteralPath $projectRoot
     try {
+        $seedHelp = & python -m flask --app app:create_app seed-demo --help 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not inspect seed-demo. Check the active Python environment and app configuration.' }
+        if (($seedHelp -join "`n") -notmatch '(?m)^\s+--expected-project(?:\s|$)') {
+            throw 'This checkout only registers the local seed-demo command. The private hosted launcher requires the hosted seed-demo and verify-demo commands. See docs/database-entry-points.md.'
+        }
+        & python -m flask --app app:create_app verify-demo --help *> $null
+        if ($LASTEXITCODE -ne 0) { throw 'The hosted verify-demo command is unavailable. See docs/database-entry-points.md.' }
         & python -m flask --app app:create_app check-connections --only database
-        if ($LASTEXITCODE -ne 0) { throw 'Database connection check failed.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Database preflight failed. See the schema or connection diagnostic above.' }
         $firstCounts = $null
         foreach ($run in 1..2) {
             $seedOutput = & python -m flask --app app:create_app seed-demo --dataset $Dataset --expected-project mavpwgqjgjnvopnnqnmb --handoff-directory $HandoffDirectory --diagnose-schema
