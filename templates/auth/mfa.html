@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>{{ 'Set up your authenticator' if mode != 'challenge' else 'Confirm your sign-in' }}</h1>
+  {% if mode != 'challenge' %}
+  <p>Add a time-based account in your authenticator app. Use Ramosolo as the account name and enter this setup key.</p>
+  <p><code>{{ secret }}</code></p>
+  {% else %}
+  <p>Enter the current code from your authenticator or one of your saved recovery codes.</p>
+  {% endif %}
+  <form method="post" class="panel form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Code <input name="code" type="text" autocomplete="one-time-code" maxlength="22" required autofocus></label>
+    <div><button class="button">Confirm</button></div>
+  </form>
+  <form method="post" action="{{ url_for('auth.logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Cancel sign-in</button>
+  </form>
+</section>
+{% endblock %}

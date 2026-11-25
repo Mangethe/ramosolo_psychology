@@ -1,19 +1,27 @@
 import re
 from datetime import datetime, time, timedelta, timezone
+from functools import cache
 import pytest
 from flask import g
 from sqlalchemy import select
+from werkzeug.security import generate_password_hash
 from app import create_app
 from extensions import db
-from models import User, Institution, Membership, Patient, CareAssignment, Appointment, Admission, BookingRequest, AuditEvent
+from models import AccountVerification, User, Institution, Membership, Patient, CareAssignment, Appointment, Admission, BookingRequest, AuditEvent
 from medical_services import TZ, utcnow, statistics
+from portal_sessions import create_session
+
+
+@cache
+def synthetic_password_hash():
+    return generate_password_hash('Testing-password-123')
 
 
 @pytest.fixture
 def env():
     app = create_app({'TESTING': True, 'SECRET_KEY': 'test-only-secret',
         'SQLALCHEMY_DATABASE_URI': 'sqlite://', 'SQLALCHEMY_ENGINE_OPTIONS': {},
-        'WTF_CSRF_ENABLED': False})
+        'WTF_CSRF_ENABLED': False, 'AUTH_REQUIRE_STAFF_MFA': False})
     with app.app_context():
         db.create_all()
         medical = Institution(name='Test medical A', kind='medical')
@@ -22,8 +30,10 @@ def env():
         db.session.add_all([medical, other, education]); db.session.flush()
         users = {}
         for role in ['admin','dr','dr2','nurse','dr_assist','patient','otherpatient','foreign','edu']:
-            u = User(name='Test '+role, email=role+'@example.test'); u.set_password('Testing-password-123')
+            u = User(name='Test '+role, email=role+'@example.test',
+                     password_hash=synthetic_password_hash(), session_version=2)
             db.session.add(u); db.session.flush(); users[role] = u
+            db.session.add(AccountVerification(user_id=u.id, verified_email=u.email, verified_at=1))
             inst = other if role == 'foreign' else education if role == 'edu' else medical
             assigned_role = 'dr' if role in ['dr2','foreign'] else 'patient' if role=='otherpatient' else 'admin' if role=='edu' else role
             db.session.add(Membership(user_id=u.id,institution_id=inst.id,role=assigned_role,
@@ -48,11 +58,19 @@ def as_user(env, role):
     g.pop("_login_user", None)
     app,users,*_=env
     client=app.test_client()
-    with client.session_transaction() as session:
-        session['_user_id']=users[role].get_id(); session['_fresh']=True
-        import time
-        session['_auth_started_at']=session['_auth_last_seen']=int(time.time())
+    login_fixture(client, users[role])
     return client
+
+
+def login_fixture(client, user, institution_id=None):
+    token = create_session(user)
+    db.session.commit()
+    with client.session_transaction() as session:
+        session['_user_id'] = user.get_id()
+        session['_fresh'] = True
+        session['portal_token'] = token
+        if institution_id is not None:
+            session['institution_id'] = institution_id
 
 
 @pytest.mark.parametrize('role',['admin','dr','nurse','dr_assist','patient'])
@@ -230,7 +248,7 @@ def test_suspended_membership_stops_existing_session(env):
     client=as_user(env,'dr')
     member=db.session.scalar(select(Membership).where(Membership.user_id==env[1]['dr'].id))
     member.enabled=False;db.session.commit()
-    assert client.get('/med/patients').status_code==403
+    assert client.get('/med/patients').status_code==302
 
 
 def test_suspended_supervisor_stops_assistant_data(env):

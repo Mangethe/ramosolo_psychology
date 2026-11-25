@@ -188,6 +188,8 @@ def change(appointment,patient,starts,expected,reason,proposal=None):
         other.state='accepted' if proposal and other.id==proposal.id else 'superseded'
         other.responded_at=utcnow()
     refresh_reminders(appointment)
+    from appointment_email import queue
+    queue(appointment, 'appt_rescheduled')
 
 
 def propose(appointment, patient, starts, expected, reason):

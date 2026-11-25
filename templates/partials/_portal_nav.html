@@ -14,7 +14,7 @@
   {% if capability('export') %}{% set links=links+[('med.export_records','Authorized exports')] %}{% endif %}
   {% set links=links+[('med.permission_matrix','Roles & permissions')] %}
 {% endif %}
-{% set links=links+[('admin.institutions','Institutions')] %}
+{% set links=links+[('admin.institutions','Institutions'),('auth.security_settings','Account security')] %}
 {% set nav_groups={
   'med.patients': ['med.patients','med.patient_detail','med.care_plan','med.clinical_records','med.observations','med.external_practitioners','med.patient_permissions','med.coordination_cover'],
   'med.calendar': ['med.calendar','med.calendar_availability'],

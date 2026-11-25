@@ -1,4 +1,8 @@
 from .models_core import User, Institution
+from .models_auth import (AccountRecovery, AccountVerification, AppointmentEmail, Authenticator, DeliveryLimit,
+                          FederatedIdentity, OIDCExchange,
+                          PendingAuthentication, PhoneChallenge, PortalSession, RecoveryCode, SecurityEmail,
+                          VerifiedPhone)
 from .models_rbac import Membership, ROLES
 from .models_medical import Patient, CareAssignment, Appointment, Admission, BookingRequest
 from .models_governance import AuditEvent

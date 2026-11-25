@@ -326,6 +326,14 @@ summary{cursor:pointer}
 .public-footer .fine{color:#bbd2e5;font-size:.75rem}
 .footer-bottom{max-width:1376px;margin:auto;border-top:1px solid #ffffff2e;padding:22px 0;display:flex;justify-content:space-between;gap:20px;font-size:.78rem;color:#ccdfed}
 .site-footer a:focus-visible{outline-color:#a2d5ff}
+.session-warning{position:fixed;inset:0;margin:auto;width:min(36rem,calc(100% - 2rem));max-height:calc(100% - 2rem);overflow:auto}
+.session-warning::backdrop{background:rgba(6,21,35,.72)}
+.session-warning .form-actions{display:flex;flex-wrap:wrap;gap:.75rem}
+.session-warning [hidden]{display:none}
+.session-screen-unavailable{display:none}
+.session-screen-locked .session-screen-unavailable{display:block;margin:2rem}
+.session-screen-locked body > :not(.session-screen-unavailable):not(.session-warning){display:none!important}
+.session-screen-ended body{background:var(--white)}
 .portal-body{display:block;background:#f5f8fc;min-height:100vh}
 .portal-layout{max-width:1600px;margin:auto;display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start;min-height:calc(100vh - 100px)}
 .sidebar{position:sticky;inset:auto;top:0;width:auto;max-height:100dvh;overflow-y:auto;padding:26px 18px;background:#fff;display:block;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}

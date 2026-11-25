@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>Request a confirmation email</h1>
+  <form method="post" class="panel form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Email address<input type="email" name="email" maxlength="254" autocomplete="email" required></label>
+    <div><button class="button">Request email</button></div>
+  </form>
+  <p><a href="{{ url_for('auth.login') }}">Return to sign in</a></p>
+</section>
+{% endblock %}

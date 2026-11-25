@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>Save your recovery codes</h1>
+  <p>Each code works once. Store them securely before continuing. This page is your only opportunity to copy them.</p>
+  <ul>{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+  <a class="button" href="{{ url_for('med.dashboard') }}">Continue to the portal</a>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>{{ 'Link your identity provider' if linking else 'Continue signing in' }}</h1>
+  {% if linking %}<p>Confirm that you want to link the identity provider account you just used to this portal account.</p>{% endif %}
+  <form method="post" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="button">{{ 'Confirm link' if linking else 'Continue' }}</button>
+  </form>
+</section>
+{% endblock %}

@@ -57,10 +57,10 @@ def create_app(test_config=None):
                 connection_record.info['ramosolo_schema'] = schema
             event.listen(engine, 'checkout', postgres_schema_on_checkout)
     login_manager.init_app(app)
-    csrf.init_app(app)
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please sign in to access your portal.'
     configure_security(app)
+    csrf.init_app(app)
     # Forwarded headers are trusted only when the operator explicitly configures
     # the exact proxy count AND prevents direct access to the backend listener.
     if app.config['TRUSTED_PROXY_HOPS']:
@@ -72,15 +72,18 @@ def create_app(test_config=None):
     def unauthorized():
         # Do not copy arbitrary patient-related query strings into login URLs.
         return redirect(url_for('auth.login'))
-    from models import User, ROLES
+    from models import ROLES
+    from portal_sessions import clock, deadlines, load_session, page_identity
     from access import membership_for_request
     from auth import bp as auth_bp
+    from sso import register_sso
     from Med.MedWebsite.controllers import bp as med_bp
     from administration import bp as admin_bp
     from cli import register_commands
     app.register_blueprint(auth_bp)
     app.register_blueprint(med_bp)
     app.register_blueprint(admin_bp)
+    register_sso(app)
     app.before_request(membership_for_request)
     register_commands(app)
 
@@ -88,18 +91,10 @@ def create_app(test_config=None):
     def load_user(user_id):
         if getattr(g, 'database_unavailable', False):
             return None
-        from security import valid_login_clock
-        if not valid_login_clock(app):
-            # Flask-Login can otherwise restore an old remember cookie after
-            # before_request has rejected an expired or missing login session.
-            session['_remember']='clear'
-            return None
-        try:
-            identity, version = user_id.split(':')
-            user = db.session.get(User, int(identity))
-            return user if user and user.enabled and user.session_version == int(version) else None
-        except (ValueError, TypeError):
-            return None
+        user = load_session(user_id)
+        if user is None:
+            session['_remember'] = 'clear'
+        return user
 
     @app.template_filter('localtime')
     def localtime(value, fmt='%d %b %Y · %H:%M'):
@@ -111,10 +106,16 @@ def create_app(test_config=None):
     def shared_context():
         from access import can_patient, capability
         from policy_info import CARD, OFFICIAL_LINKS
+        portal = getattr(g, 'portal_session', None)
+        now = clock()
+        expiry, absolute = deadlines(portal) if portal else (now, now)
         return dict(roles=ROLES, membership=getattr(g, 'membership', None),
                     memberships=getattr(g, 'memberships', []), current_year=datetime.now().year,
                     can_patient=can_patient, capability=capability, official=OFFICIAL_LINKS,
-                    practice_contact=CARD)
+                    practice_contact=CARD, sso_enabled=app.config['AUTH_SSO_ENABLED'],
+                    portal_page=page_identity(portal) if portal else None,
+                    portal_idle_remaining=expiry - now, portal_absolute_remaining=absolute - now,
+                    portal_warning=app.config['AUTH_WARNING_SECONDS'])
 
     @app.after_request
     def response_headers(response):

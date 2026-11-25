@@ -100,9 +100,11 @@ def latest_policy(kind):
         .order_by(CoordinationPolicy.version.desc()).limit(1))
 
 
-def latest_decision(patient_id,purpose,channel,scope='practice'):
+def latest_decision(patient_id,purpose,channel,scope='practice',*,institution_id=None):
+    if institution_id is None:
+        institution_id = g.membership.institution_id
     return db.session.scalar(select(CommunicationDecision).where(
-        CommunicationDecision.institution_id==g.membership.institution_id,
+        CommunicationDecision.institution_id==institution_id,
         CommunicationDecision.patient_id==patient_id,CommunicationDecision.purpose==purpose,
         CommunicationDecision.channel==channel,CommunicationDecision.scope.in_((scope,'*')))
         .order_by(CommunicationDecision.id.desc()).limit(1))
@@ -119,6 +121,10 @@ def communication_allowed(patient_id,purpose,channel,scope='practice',check_wind
                 preferences.c.patient_id==patient_id,Patient.institution_id==g.membership.institution_id,
                 Membership.institution_id==g.membership.institution_id,Membership.role=='patient',Membership.enabled.is_(True),
                 User.enabled.is_(True),preferences.c.in_app_enabled.is_(True),preferences.c.in_app_consent_at.is_not(None)).limit(1)) is not None
+    return verified_communication_allowed(decision, check_window=check_window)
+
+
+def verified_communication_allowed(decision, *, check_window=True):
     if not decision or decision.status!='granted' or not decision.destination or not decision.verified_at:
         return False
     if check_window and decision.contact_start and decision.contact_end:

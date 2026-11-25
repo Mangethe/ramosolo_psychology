@@ -1,0 +1,21 @@
+{% if current_user.is_authenticated %}
+<p class="session-screen-unavailable" role="status">Checking session. JavaScript is required to display private portal pages.</p>
+<dialog class="panel session-warning" id="session-warning" aria-labelledby="session-warning-title"
+  aria-describedby="session-warning-help" data-status="{{ url_for('auth.session_status') }}"
+  data-extend="{{ url_for('auth.session_extend') }}" data-logout="{{ url_for('auth.logout') }}"
+  data-home="{{ url_for('med.home') }}" data-login="{{ url_for('auth.login') }}"
+  data-page="{{ portal_page or '' }}" data-csrf="{{ csrf_token() }}"
+  data-remaining="{{ portal_idle_remaining }}" data-absolute="{{ portal_absolute_remaining }}"
+  data-warning="{{ portal_warning }}">
+  <h2 id="session-warning-title">Your session is about to end</h2>
+  <p id="session-warning-help">Save your work before the session ends. Unsaved changes will be cleared on expiry or sign-out.</p>
+  <p id="session-warning-message" role="status"></p>
+  <p>Time remaining <span id="session-warning-clock" role="timer" aria-live="off"></span></p>
+  <div class="form-actions">
+    <button class="button" type="button" id="session-stay" autofocus>Stay signed in</button>
+    <button class="button" type="button" id="session-logout">Log out now</button>
+    <a class="button" id="session-login" href="{{ url_for('auth.login') }}" hidden>Sign in again</a>
+  </div>
+</dialog>
+<script defer src="{{ url_for('static', filename='js/session-warning.js') }}"></script>
+{% endif %}

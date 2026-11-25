@@ -16,13 +16,17 @@ from psycopg import sql
 from sqlalchemy import select, func, create_engine, inspect, text
 from app import create_app
 from extensions import db
-from models import (User, Institution, Membership, Patient, CareAssignment, CarePlan,
+from models import (AccountVerification, User, Institution, Membership, Patient, CareAssignment, CarePlan,
                     Appointment, ContinuityEvent, ContinuityHistory, ClinicalRecord)
 from medical_services import utcnow, TZ
 from continuity_services import KINDS
 
 ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(os.environ.get('RAMOSOLO_POSTGRES_BIN', 'C:/Program Files/PostgreSQL/18/bin'))
+AUTH_TABLES = {'portal_sessions', 'account_verifications', 'security_emails', 'authenticators',
+               'auth_recovery_codes', 'pending_authentications', 'federated_identities', 'oidc_exchanges',
+               'account_recoveries'}
+DELIVERY_TABLES = {'appointment_emails', 'delivery_limits', 'verified_phones', 'phone_challenges'}
 
 
 def test_factory_cli_schema_after_rollback_and_connection_reuse(isolated_database):
@@ -169,7 +173,7 @@ def test_reconciliation_draft_applies_to_reconstructed_production_fixture(isolat
         assert connection.execute('SELECT version FROM ramosolo.schema_versions ORDER BY version').fetchall() == [
             (n,) for n in range(1, 10)]
         orm_columns = {(table.name, column.name) for table in db.metadata.tables.values()
-            for column in table.columns}
+            if table.name not in AUTH_TABLES | DELIVERY_TABLES for column in table.columns}
         fixture_columns = set(connection.execute("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='ramosolo'").fetchall())
         assert orm_columns <= fixture_columns
         assert connection.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema='ramosolo' AND table_type='BASE TABLE'").fetchone()[0] == 51
@@ -353,35 +357,98 @@ def test_reconciliation_draft_rolls_back_when_postcondition_fails(isolated_datab
         assert connection.execute("SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='ramosolo' AND NOT t.tgisinternal").fetchone()[0] == 32
 
 
+def existing_projection(connection, tables=None):
+    if tables is None:
+        tables = {}
+        for table, column in connection.execute(
+                "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'ramosolo' "
+                "AND table_name <> 'schema_versions' ORDER BY table_name, ordinal_position"):
+            tables.setdefault(table, []).append(column)
+    rows = {}
+    for table, columns in tables.items():
+        statement = sql.SQL('SELECT row_to_json(projected)::text AS evidence FROM '
+            '(SELECT {} FROM ramosolo.{}) projected ORDER BY evidence').format(
+                sql.SQL(', ').join(map(sql.Identifier, columns)), sql.Identifier(table))
+        rows[table] = connection.execute(statement).fetchall()
+    return tables, rows
+
+
+def existing_table_grants(connection):
+    return dict((table, (owner, acl, rls, force)) for table, owner, acl, rls, force in connection.execute(
+        "SELECT c.relname, pg_get_userbyid(c.relowner), c.relacl::text, c.relrowsecurity, c.relforcerowsecurity "
+        "FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+        "WHERE n.nspname='ramosolo' AND c.relkind='r'"))
+
+
 def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isolated_database):
     """Exercise the actual SQL draft through Flask against the reconstructed live schema."""
     from datetime import time, timezone
+    from hashlib import sha256
     from sqlalchemy import func
     from models import AvailabilityPolicy, AvailabilitySession, AppointmentProposal, CalendarHistory
     from medical_services import utcnow
     from scheduling_services import local_day
     from test_calendar import local, utc_on
-    fixture = (ROOT/'tests'/'fixtures'/'ramosolo_live_fixture.sql').read_text(encoding='utf-8')
-    draft = (ROOT/'migrations'/'010_ramosolo_live_reconciliation_draft.sql').read_text(encoding='utf-8')
+    fixture = (ROOT/'tests'/'fixtures'/'ramosolo_live_fixture.sql').read_bytes().decode('utf-8')
+    reviewed = (ROOT/'migrations'/'010_ramosolo_live_reconciliation_draft.sql').read_bytes()
+    assert sha256(reviewed).hexdigest() == '50067e6fe6898c494d153943242e4f277d9a50bc49695d01b51d69860e054a34'
+    draft = reviewed.decode('utf-8')
     with psycopg.connect(isolated_database, autocommit=True) as connection:
         connection.execute(fixture)
+        tables, original = existing_projection(connection)
+        original_grants = existing_table_grants(connection)
         connection.execute('SET ROLE postgres')
         connection.execute(draft)
+        assert existing_projection(connection, tables)[1] == original
+        assert {table: acl for table, acl in existing_table_grants(connection).items()
+                if table in original_grants} == original_grants
+        connection.execute(
+            "INSERT INTO ramosolo.clinical_records(institution_id,patient_id,author_id,kind,content,created_at) "
+            "VALUES (1,1,1,'diagnoses','Synthetic migration preservation record',timestamp '2026-11-17 08:00:00')")
+        tables, reconciled = existing_projection(connection)
+        reconciled_grants = existing_table_grants(connection)
+        for number in range(11, 15):
+            connection.execute(migration(number))
+        assert existing_projection(connection, tables)[1] == reconciled
+        assert {table: acl for table, acl in existing_table_grants(connection).items()
+                if table in reconciled_grants} == reconciled_grants
+        assert connection.execute('SELECT version FROM ramosolo.schema_versions ORDER BY version').fetchall() == [
+            (version,) for version in range(1, 10)]
+        for table in AUTH_TABLES:
+            assert existing_table_grants(connection)[table][0] == 'postgres'
+            assert connection.execute(sql.SQL('SELECT count(*) FROM ramosolo.{}').format(
+                sql.Identifier(table))).fetchone() == (0,)
+        for number in (15, 16):
+            connection.execute(migration(number))
+        assert existing_projection(connection, tables)[1] == reconciled
+        for table in DELIVERY_TABLES:
+            owner, _, rls, _ = existing_table_grants(connection)[table]
+            assert owner == 'postgres' and rls
+            assert connection.execute("SELECT has_table_privilege('anon', %s, 'SELECT'), "
+                "has_table_privilege('authenticated', %s, 'SELECT')",
+                ('ramosolo.' + table, 'ramosolo.' + table)).fetchone() == (False, False)
+            assert connection.execute(sql.SQL('SELECT count(*) FROM ramosolo.{}').format(
+                sql.Identifier(table))).fetchone() == (0,)
         connection.execute('RESET ROLE')
 
     app = create_app({'TESTING': True, 'SECRET_KEY': 'synthetic-reconciliation-app',
         'SQLALCHEMY_DATABASE_URI': isolated_database.replace('postgresql://','postgresql+psycopg://',1),
-        'SQLALCHEMY_ENGINE_OPTIONS': {}, 'DB_SCHEMA': 'ramosolo', 'WTF_CSRF_ENABLED': False})
+        'SQLALCHEMY_ENGINE_OPTIONS': {}, 'DB_SCHEMA': 'ramosolo', 'WTF_CSRF_ENABLED': False,
+        'AUTH_REQUIRE_STAFF_MFA': False})
     synthetic_password = 'Synthetic-only reconciliation login 3!'
     with app.app_context():
         doctor = db.session.get(User, 1)
         doctor.set_password(synthetic_password)
+        for user in db.session.scalars(select(User).where(User.id != doctor.id)):
+            db.session.add(AccountVerification(user_id=user.id, verified_email=user.email, verified_at=1))
         admin = User(name='Synthetic fixture admin', email='fixture-admin@example.test',
             password_hash='disabled-synthetic-login', enabled=True, session_version=1)
         second_portal_user = User(name='Synthetic fixture patient B', email='fixture-patient-b@example.test',
             password_hash='disabled-synthetic-login', enabled=True, session_version=1)
         db.session.add_all([admin, second_portal_user])
         db.session.flush()
+        db.session.add_all(AccountVerification(user_id=user.id, verified_email=user.email, verified_at=1)
+                           for user in (admin, second_portal_user))
         db.session.add(Membership(user_id=admin.id, institution_id=1, role='admin', enabled=True))
         db.session.add(Membership(user_id=second_portal_user.id, institution_id=1, role='patient', enabled=True))
         db.session.flush()
@@ -421,6 +488,15 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
         db.session.commit()
 
     client = app.test_client()
+    response = client.post('/auth/login', data={
+        'email': 'fixture-doctor-a@example.test', 'password': synthetic_password})
+    assert response.status_code == 302 and response.location.endswith('/auth/verification')
+    assert client.get('/med/patients').status_code == 302
+    from account_verification import verification_token
+    with app.app_context():
+        state = db.session.get(AccountVerification, 1)
+        token = verification_token(state.verification_id, state.user_id, state.requested_email)
+    assert client.post('/auth/verify', data={'token': token}).location.endswith('/auth/login')
     response = client.post('/auth/login', data={
         'email': 'fixture-doctor-a@example.test', 'password': synthetic_password})
     assert response.status_code == 302 and '/med' in response.headers['Location']
@@ -542,13 +618,12 @@ def db_identity(app, identity):
 
 
 def authenticated_app_client(app, user_id, institution_id):
+    from test_medical import login_fixture
     client = app.test_client()
-    with client.session_transaction() as session:
-        import time
-        session['_user_id'] = user_id
-        session['_fresh'] = True
-        session['_auth_started_at'] = session['_auth_last_seen'] = int(time.time())
-        session['institution_id'] = institution_id
+    with app.app_context():
+        user = db.session.get(User, int(user_id.split(':')[0]))
+        assert user.get_id() == user_id
+        login_fixture(client, user, institution_id)
     return client
 
 
@@ -605,7 +680,60 @@ def isolated_database(local_pg):
 
 
 def migration(number):
-    return next((ROOT/'migrations').glob(f'{number:03}_*.sql')).read_text(encoding='utf-8')
+    return next((ROOT/'migrations').glob(f'{number:03}_*.sql')).read_bytes().decode('utf-8')
+
+
+def test_account_security_drafts_are_additive_and_private(isolated_database):
+    with psycopg.connect(isolated_database, autocommit=True) as connection:
+        connection.execute('CREATE SCHEMA ramosolo')
+        connection.execute('CREATE TABLE ramosolo.users (id integer PRIMARY KEY, sentinel text NOT NULL)')
+        connection.execute('CREATE TABLE ramosolo.institutions (id integer PRIMARY KEY)')
+        connection.execute("INSERT INTO ramosolo.users VALUES (1, 'synthetic existing account')")
+        for number in range(11, 15):
+            connection.execute(migration(number))
+        assert connection.execute('SELECT id, sentinel FROM ramosolo.users').fetchall() == [
+            (1, 'synthetic existing account')]
+        rows = connection.execute(
+            """SELECT c.relname, c.relrowsecurity, has_table_privilege('anon', c.oid, 'SELECT'),
+                      has_table_privilege('authenticated', c.oid, 'SELECT')
+                 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'ramosolo' AND c.relkind = 'r' AND c.relname NOT IN ('users','institutions')"""
+        ).fetchall()
+        assert {row[0] for row in rows} == AUTH_TABLES
+        assert all(private and not anon and not authenticated for _, private, anon, authenticated in rows)
+        for name in AUTH_TABLES:
+            columns = {row[0] for row in connection.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'ramosolo' "
+                "AND table_name = %s", (name,)).fetchall()}
+            assert columns == set(db.metadata.tables[name].columns.keys())
+
+
+def test_delivery_drafts_preserve_existing_jobs_and_keep_private_tables(isolated_database):
+    with psycopg.connect(isolated_database, autocommit=True) as connection:
+        connection.execute('CREATE SCHEMA ramosolo')
+        for table in ('users', 'institutions', 'appointments', 'patients', 'communication_decisions'):
+            connection.execute(sql.SQL('CREATE TABLE ramosolo.{} (id integer PRIMARY KEY)').format(sql.Identifier(table)))
+        connection.execute(migration(12))
+        connection.execute('INSERT INTO ramosolo.users VALUES (1)')
+        connection.execute("""INSERT INTO ramosolo.security_emails
+            (dedupe_key,user_id,recipient,kind,created_at,next_attempt_at)
+            VALUES ('legacy-synthetic',1,'synthetic@example.test','welcome',100,100)""")
+        before = connection.execute('SELECT * FROM ramosolo.security_emails').fetchall()
+        for number in (15, 16):
+            connection.execute(migration(number))
+        assert connection.execute('SELECT * FROM ramosolo.security_emails').fetchall() == before
+        for table in DELIVERY_TABLES:
+            full_name = 'ramosolo.' + table
+            assert connection.execute("""SELECT relrowsecurity,
+                has_table_privilege('anon', oid, 'SELECT'),
+                has_table_privilege('authenticated', oid, 'SELECT')
+                FROM pg_class WHERE oid = %s::regclass""", (full_name,)).fetchone() == (True, False, False)
+            columns = connection.execute("""SELECT column_name, is_nullable
+                FROM information_schema.columns WHERE table_schema='ramosolo' AND table_name=%s""", (table,))
+            assert {name: nullable == 'YES' for name, nullable in columns} == {
+                col.name: col.nullable for col in db.metadata.tables[table].columns}
+        assert connection.execute("""SELECT is_nullable FROM information_schema.columns
+            WHERE table_schema='ramosolo' AND table_name='security_emails' AND column_name='user_id'""").fetchone() == ('YES',)
 
 
 def test_new_database_migrations_match_orm_and_preserve_synthetic_existing_rows(isolated_database):
@@ -624,6 +752,8 @@ def test_new_database_migrations_match_orm_and_preserve_synthetic_existing_rows(
     try:
         actual=inspect(engine)
         for table in db.metadata.sorted_tables:
+            if table.name in AUTH_TABLES | DELIVERY_TABLES:
+                continue  # Historical baseline before the independent auth drafts.
             columns={c['name']:c for c in actual.get_columns(table.name)}
             assert set(columns)==set(table.columns.keys()),table.name
             for column in table.columns:
@@ -652,7 +782,7 @@ def test_current_schema_name_and_migration_ledger_are_incompatible_without_recon
 def pg_case(isolated_database):
     app=create_app({'TESTING':True,'SECRET_KEY':'synthetic-pg-review',
         'SQLALCHEMY_DATABASE_URI':isolated_database.replace('postgresql://','postgresql+psycopg://'),
-        'SQLALCHEMY_ENGINE_OPTIONS':{},'WTF_CSRF_ENABLED':False})
+        'SQLALCHEMY_ENGINE_OPTIONS':{},'WTF_CSRF_ENABLED':False,'AUTH_REQUIRE_STAFF_MFA':False})
     with app.app_context():
         db.create_all()
         a=Institution(name='Synthetic A',kind='medical');b=Institution(name='Synthetic B',kind='medical')
@@ -662,6 +792,7 @@ def pg_case(isolated_database):
             user=User(name='Synthetic '+role,email=role+'@independent.test',
                 password_hash='synthetic-disabled-password-login',enabled=True,session_version=1)
             db.session.add(user);db.session.flush();users[role]=user
+            db.session.add(AccountVerification(user_id=user.id, verified_email=user.email, verified_at=1))
             db.session.add(Membership(user_id=user.id,institution_id=b.id if role=='foreign' else a.id,
                 role='dr' if role in ('dr2','foreign') else role,
                 supervising_doctor_id=users['dr'].id if role=='dr_assist' else None))
@@ -688,12 +819,66 @@ def pg_case(isolated_database):
 
 
 def client_for(case,role):
-    client=case[0].test_client()
-    with client.session_transaction() as session:
-        session['_user_id']=case[2][role];session['_fresh']=True
-        import time
-        session['_auth_started_at']=session['_auth_last_seen']=int(time.time())
-    return client
+    return authenticated_app_client(case[0], case[2][role], None)
+
+
+def test_simultaneous_phone_checks_claim_once_in_postgres(pg_case):
+    from datetime import datetime, timezone
+    from cryptography.fernet import Fernet
+    import phone_verification
+    from models import PhoneChallenge, PortalSession, VerifiedPhone
+    from portal_sessions import digest
+    from sms_delivery import FakeSMSProvider
+    from test_account_security import copy_cookie
+    from test_delivery import FIRST, PHONE_PATH
+
+    app, _, identities = pg_case
+    user_id = int(identities['dr'].split(':')[0])
+    key = Fernet.generate_key()
+    app.config.update(SMS_PROVIDER='fake', SMS_POLICY_APPROVED=True, SMS_ELIGIBLE_ROLES='dr',
+        SMS_ALLOWED_REGIONS='US', SMS_DAILY_MAX=10, SMS_KEY=key,
+        SMS_LIMIT_KEY='synthetic-pg-only-limit-secret-configuration')
+    provider = FakeSMSProvider()
+    app.extensions['portal_fake_sms'] = provider
+    client = client_for(pg_case, 'dr')
+    other = copy_cookie(app, client)
+    with client.session_transaction() as signed:
+        token_hash = digest(signed['portal_token'])
+    now = int(datetime.now(timezone.utc).timestamp())
+    reference = provider.send(FIRST)
+    row_id = 'synthetic-postgres-otp-claim'
+    with app.app_context():
+        portal = db.session.get(PortalSession, token_hash)
+        institution_id = db.session.scalar(select(Membership.institution_id).where(Membership.user_id == user_id))
+        db.session.add(PhoneChallenge(user_id=user_id, challenge_id=row_id, institution_id=institution_id,
+            purpose=phone_verification.PURPOSE, session_hash=portal.token_hash,
+            encrypted_number=Fernet(key).encrypt(FIRST.encode()), destination_key='synthetic',
+            reference=reference, provider='fake', state='pending', expires_at=now+300,
+            resend_after=now+60, sends=1, attempts=0))
+        db.session.commit()
+    entered, finish = threading.Event(), threading.Event()
+    calls = []
+    original = provider.check
+
+    def pause_check(*args):
+        calls.append(1)
+        entered.set()
+        assert finish.wait(5)
+        return original(*args)
+
+    provider.check = pause_check
+    payload = {'action': 'check', 'challenge_id': row_id, 'code': provider.challenges[FIRST][1]}
+    with ThreadPoolExecutor(max_workers=2) as threads:
+        attempt = threads.submit(client.post, PHONE_PATH, data=payload)
+        assert entered.wait(5)
+        try:
+            denied = threads.submit(other.post, PHONE_PATH, data=payload).result(timeout=5)
+        finally:
+            finish.set()
+        assert attempt.result(timeout=5).location.endswith('/auth/login')
+    assert denied.location.endswith(PHONE_PATH) and calls == [1]
+    with app.app_context():
+        assert db.session.get(VerifiedPhone, user_id)
 
 
 def simultaneous(call):

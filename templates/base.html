@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if current_user.is_authenticated %} class="session-screen-locked"{% endif %}>
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#102c4c">
@@ -13,6 +13,7 @@
   {% set shell='public' %}{% include 'partials/_navbar.html' %}
   <main id="main" class="public-main" tabindex="-1">{% include 'partials/flashes.html' %}{% block content %}{% endblock %}</main>
   {% include 'partials/_footer.html' %}
+  {% include 'partials/_session_warning.html' %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

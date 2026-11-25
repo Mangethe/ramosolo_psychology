@@ -30,7 +30,9 @@ def test_drafts_public_for_all_roles_without_private_data(env,role):
         assert 'FOREIGN PRIVATE PATIENT' not in body
         assert r.headers['Cache-Control']=='no-store'
         assert r.headers['X-Content-Type-Options']=='nosniff'
-        assert '<script' not in body and '<iframe' not in body
+        session_script = '<script defer src="/static/js/session-warning.js"></script>'
+        assert body.count(session_script) == (1 if role else 0)
+        assert '<script' not in body.replace(session_script, '') and '<iframe' not in body
         assert 'ls-launcher' not in body
         for typo in ('HSPCA','HPSCA','HPCAS'):assert typo not in body
         assert not re.search(r'(fully POPIA compliant|HPCSA approved)',body,re.I)

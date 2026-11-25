@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, g, session, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, g, abort
 from flask_login import current_user, login_required
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -6,6 +6,7 @@ from extensions import db
 from models import User, Institution, Membership, Patient, BookingRequest, AuditEvent, ROLES
 from access import require_roles, require_capability, audit, accessible_patient
 from medical_services import doctors
+from account_verification import issue, valid_address, welcome_if_active
 
 bp = Blueprint('admin', __name__)
 
@@ -17,7 +18,9 @@ def institutions():
         selected = request.form.get('institution_id', type=int)
         if selected not in [m.institution_id for m in g.memberships]:
             abort(403)
-        session['institution_id'] = selected
+        from portal_sessions import rotate
+        if not rotate(current_user, selected):
+            return redirect(url_for('auth.login'))
         return redirect(url_for('med.dashboard'))
     return render_template('institutions/index.html')
 
@@ -34,7 +37,7 @@ def users():
         role = request.form.get('role', '')
         doctor_id = request.form.get('doctor_id', type=int)
         patient_id = request.form.get('patient_id', type=int)
-        if not 2 <= len(name) <= 120 or '@' not in email or len(email) > 254 or not 12 <= len(password) <= 128 or role not in ROLES:
+        if not 2 <= len(name) <= 120 or not valid_address(email) or not 12 <= len(password) <= 128 or role not in ROLES:
             flash('Check the name, email, role and a password of 12–128 characters.', 'error')
             return redirect(url_for('admin.users'))
         if role in ('patient', 'dr_assist') and doctor_id not in [d.id for d in med_doctors]:
@@ -62,9 +65,10 @@ def users():
                 db.session.add(Patient(institution_id=institution_id, user_id=user.id,
                     doctor_id=doctor_id, name=name, email=email))
         audit('create_account', 'user', user.id)
+        issue(user, email, initial=True)
         try:
             db.session.commit()
-            flash('Account created. Share credentials directly with the intended user.', 'success')
+            flash('Account created. Email confirmation is required before sign-in.', 'success')
         except IntegrityError:
             db.session.rollback()
             flash('The account could not be created. Check for duplicate records.', 'error')
@@ -85,7 +89,14 @@ def toggle_member(member_id):
         abort(404)
     if member.user_id == current_user.id:
         abort(400)
+    user = db.session.get(User, member.user_id, with_for_update=True, populate_existing=True)
+    db.session.refresh(member, with_for_update=True)
+    if member.institution_id != g.membership.institution_id:
+        abort(404)
     member.enabled = not member.enabled
+    user.session_version += 1
+    if member.enabled:
+        welcome_if_active(user)
     audit('toggle_membership', 'membership', member.id)
     db.session.commit()
     return redirect(url_for('admin.users'))

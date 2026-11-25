@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>Account help</h1>
+  <p>If a sign-in or security change was unexpected, contact the practice directly at {{ support_phone or practice_contact.telephone }}. Use a number you already trust to verify the practice's identity.</p>
+  <p>For account recovery, use your authenticator or a saved recovery code. Contact the practice if you have lost both.</p>
+  <p><a href="{{ url_for('auth.resend_verification') }}">Request a confirmation email</a></p>
+</section>
+{% endblock %}

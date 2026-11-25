@@ -9,6 +9,82 @@ from medical_services import utcnow
 
 
 def register_commands(app):
+    @app.cli.command('deliver-email')
+    @click.option('--live', is_flag=True, help='Explicitly use the approved Gmail pilot.')
+    @click.option('--limit', type=click.IntRange(1, 100), default=25)
+    def deliver_email(live, limit):
+        """Drain portal email using the fake transport by default."""
+        from mail_delivery import GmailProvider
+        from security_email import FakeMailProvider, deliver_pending
+        if live:
+            if (current_app.testing or db.engine.dialect.name != 'postgresql'
+                    or current_app.config['MAIL_PROVIDER'] == 'fake'):
+                raise click.ClickException('Live mode requires the approved PostgreSQL worker and Gmail settings.')
+            from security_email import trusted_origin
+            try:
+                trusted_origin(current_app.config['AUTH_PUBLIC_URL'], https_only=True)
+                provider = GmailProvider(current_app.config)
+            except (TypeError, ValueError):
+                raise click.ClickException('Gmail pilot configuration is incomplete or invalid.') from None
+        else:
+            if current_app.config['PRODUCTION'] or db.engine.dialect.name != 'sqlite':
+                raise click.ClickException('Fake delivery is for disposable synthetic SQLite outboxes.')
+            provider = FakeMailProvider()
+        count = deliver_pending(provider, limit=limit)
+        click.echo(f'Provider accepted: {count}' if live else f'Synthetic messages processed: {count}')
+
+    @app.cli.command('start-assisted-recovery')
+    @click.option('--institution-id', type=int, required=True)
+    @click.option('--user-id', type=int, required=True)
+    @click.option('--requestor-id', type=int, required=True)
+    @click.option('--approver-id', type=int, required=True)
+    @click.option('--ticket', required=True, help='Opaque approved incident identifier.')
+    @click.option('--replacement-email', help='Prompt for a separately approved replacement mailbox.', is_flag=True)
+    @click.option('--reset-password', help='Prompt for a separately approved replacement password.', is_flag=True)
+    def start_assisted_recovery(institution_id, user_id, requestor_id, approver_id, ticket, replacement_email,
+                                reset_password):
+        """Controlled recovery after identity proof and recorded dual approval."""
+        from sqlalchemy.exc import IntegrityError
+        from account_recovery import start_recovery
+        address = click.prompt('Approved replacement mailbox', hide_input=True, confirmation_prompt=True) if replacement_email else None
+        password = click.prompt('Replacement password', hide_input=True, confirmation_prompt=True) if reset_password else None
+        proofs = []
+        for label, identity in (('Requestor', requestor_id), ('Approver', approver_id)):
+            proofs.append((identity, click.prompt(f'{label} password', hide_input=True),
+                           click.prompt(f'{label} authenticator code', hide_input=True)))
+        try:
+            if start_recovery(institution_id, user_id, ticket, proofs, replacement_email=address,
+                              new_password=password):
+                click.echo('Recovery started. Email confirmation and the normal authenticator policy apply.')
+                return
+        except IntegrityError:
+            db.session.rollback()
+        raise click.ClickException('Recovery was not started. Check authority, identity proof, and account state.')
+
+    @app.cli.command('deliver-security-email-fake')
+    def deliver_security_email_fake():
+        """Mark due synthetic security emails delivered without sending them."""
+        from security_email import FakeMailProvider, deliver_pending
+        if current_app.config['PRODUCTION'] or db.engine.dialect.name != 'sqlite':
+            raise click.ClickException('Use a disposable local SQLite database with synthetic accounts.')
+        click.echo(f'Synthetic messages delivered: {deliver_pending(FakeMailProvider())}')
+
+    @app.cli.command('purge-expired-auth')
+    def purge_expired_auth():
+        """Remove expired authentication state."""
+        from sqlalchemy import delete, or_
+        from models import DeliveryLimit, OIDCExchange, PendingAuthentication, PhoneChallenge, PortalSession
+        from portal_sessions import clock
+        now = clock()
+        db.session.execute(delete(PortalSession).where(or_(
+            PortalSession.idle_expires_at <= now, PortalSession.absolute_expires_at <= now)))
+        db.session.execute(delete(PendingAuthentication).where(PendingAuthentication.expires_at <= now))
+        db.session.execute(delete(OIDCExchange).where(OIDCExchange.expires_at <= now))
+        db.session.execute(delete(PhoneChallenge).where(PhoneChallenge.expires_at <= now))
+        db.session.execute(delete(DeliveryLimit).where(DeliveryLimit.expires_at <= now))
+        db.session.commit()
+        click.echo('Expired authentication state removed.')
+
     @app.cli.command('check-connections')
     @click.option('--only', type=click.Choice(['database']), default='database')
     def check_connections(only):
@@ -177,15 +253,18 @@ def register_commands(app):
     @click.option('--email', prompt=True)
     @click.password_option()
     def create_admin(institution_id, name, email, password):
+        from account_verification import issue, valid_address
         inst = db.session.get(Institution, institution_id)
-        if not inst or len(password) < 12 or len(password) > 128 or '@' not in email:
+        email = email.strip().lower()
+        if not inst or len(password) < 12 or len(password) > 128 or not valid_address(email):
             raise click.ClickException('Check institution, email and password (12–128 characters).')
         if db.session.scalar(select(User.id).where(User.email==email.strip().lower())):
             raise click.ClickException('Account exists. Use add-membership instead.')
         user = User(name=name[:120], email=email.strip().lower()[:254]); user.set_password(password)
         db.session.add(user); db.session.flush()
         db.session.add(Membership(user_id=user.id, institution_id=inst.id, role='admin'))
-        db.session.commit(); click.echo('Administrator created.')
+        issue(user, email, initial=True)
+        db.session.commit(); click.echo('Administrator created. Email confirmation is required.')
 
     @app.cli.command('add-membership')
     @click.option('--email', prompt=True)
@@ -193,7 +272,8 @@ def register_commands(app):
     @click.option('--role', type=click.Choice(list(ROLES)), prompt=True)
     @click.option('--doctor-id', type=int)
     def add_membership(email, institution_id, role, doctor_id):
-        user = db.session.scalar(select(User).where(User.email==email.strip().lower()))
+        from account_verification import welcome_if_active
+        user = db.session.scalar(select(User).where(User.email==email.strip().lower()).with_for_update())
         inst = db.session.get(Institution, institution_id)
         if not user or not inst:
             raise click.ClickException('Unknown user or institution.')
@@ -208,14 +288,21 @@ def register_commands(app):
             supervising_doctor_id=doctor_id if role=='dr_assist' else None))
         if role=='patient':
             db.session.add(Patient(institution_id=inst.id,user_id=user.id,doctor_id=doctor_id,name=user.name,email=user.email))
+        user.session_version += 1
+        welcome_if_active(user)
         db.session.commit(); click.echo('Membership added. Confirm identity before sharing access.')
 
     @app.cli.command('reset-password')
     @click.option('--email', prompt=True)
     @click.password_option()
     def reset_password(email, password):
-        user = db.session.scalar(select(User).where(User.email==email.strip().lower()))
+        if not current_app.testing or db.engine.dialect.name != 'sqlite':
+            raise click.ClickException('Use the dual-control start-assisted-recovery command for account recovery.')
+        from security_email import enqueue
+        user = db.session.scalar(select(User).where(User.email==email.strip().lower()).with_for_update())
         if not user or not 12 <= len(password) <= 128:
             raise click.ClickException('Unknown account or invalid password length.')
         user.set_password(password); user.failed_logins=0; user.locked_until=None
+        enqueue(user, 'change', f'credentials:{user.id}:{user.session_version}',
+                detail='The practice operator reset the sign-in password.')
         db.session.commit(); click.echo('Password reset. Verify identity before delivering it.')

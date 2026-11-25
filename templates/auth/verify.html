@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>Confirm your email</h1>
+  <form method="post" action="{{ url_for('auth.verify_email') }}" class="panel">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="token" value="{{ token }}">
+    <button class="button">Confirm email</button>
+  </form>
+  <p><a href="{{ url_for('auth.resend_verification') }}">Request a new confirmation email</a></p>
+</section>
+{% endblock %}

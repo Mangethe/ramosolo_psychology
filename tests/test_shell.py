@@ -3,6 +3,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlsplit
 from pathlib import Path
 import pytest
+from policy_info import CARD
 from test_medical import env,as_user
 
 
@@ -30,7 +31,7 @@ def test_shell_role_navigation_and_public_appointment_are_separate(env,role):
     assert any(a.get('href')=='#main' for a in page.links)
     assert any(a.get('href')=='/book' and 'appointment-action' in a.get('class','') for a in page.links)
     assert text.count('partials/_chat')==0 and 'ls-launcher' not in text
-    assert not page.scripts
+    assert page.scripts == [{'src': '/static/js/session-warning.js', 'defer': None}]
     assert len(page.styles)==1 and page.styles[0]['href'].endswith('/static/css/style.css')
     assert any(f.get('action')=='/auth/logout' and f.get('method')=='post' for f in page.forms)
     assert 'name="csrf_token"' in text
@@ -54,19 +55,20 @@ def test_shell_role_navigation_and_public_appointment_are_separate(env,role):
 
 
 @pytest.mark.parametrize('path',['/','/inpatient','/governance','/book','/auth/login'])
-def test_public_shell_links_pending_details_and_no_external_dependencies(env,path):
+def test_public_shell_links_contact_details_and_no_external_dependencies(env,path):
     r=env[0].test_client().get(path);assert r.status_code==200
     text=r.get_data(as_text=True);page=Page(text)
     assert 'Ponky Ramosolo' in text
-    for old in ['Ramasolo','Ms. P.','1033','374 Francis','012 320 6942','081 854 0795','clinicalpsychologistp@gmail.com','Akeso']:
+    for old in ['Ramasolo','Ms. P.','374 Francis','clinicalpsychologistp@gmail.com','Akeso']:
         assert old not in text
+    footer = text.split('<footer class="site-footer">', 1)[1].split('</footer>', 1)[0]
+    assert all(CARD[field] in footer for field in ('address', 'cell', 'telephone', 'fax', 'email'))
     assert not page.scripts
     assert all(not a.get('href','').startswith(('https://fonts.','https://cdn.')) for a in page.links)
     assert all(link['href'].startswith('/static/') for link in page.styles)
     assert 'ls-launcher' not in text and 'chat.message' not in text and '<style' not in text
     assert 'id="main"' in text and 'tabindex="-1"' in text
     assert 'mobile-public-menu' in text and '<summary>Menu</summary>' in text
-    assert 'awaiting practice confirmation' in text
     for a in page.links:
         href=a.get('href','')
         if href.startswith('/') and '#' in href:

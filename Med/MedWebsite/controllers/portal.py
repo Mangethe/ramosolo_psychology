@@ -171,6 +171,8 @@ def create_appointment():
         history(appointment,'scheduled',new=starts)
         from scheduling_services import refresh_reminders
         refresh_reminders(appointment)
+        from appointment_email import queue
+        queue(appointment, 'appt_confirmed')
         audit('schedule','appointment',appointment.id);db.session.commit()
         flash('Appointment scheduled. In-app reminders use the confirmed time.','success')
     except (ValueError,TypeError,IntegrityError) as error:
@@ -215,6 +217,9 @@ def appointment_status(appointment_id):
             refresh_reminders(appointment)
     try:
         db.session.flush()
+        if status != old_status:
+            from appointment_email import queue
+            queue(appointment, 'appt_cancelled' if status == 'cancelled' else None)
         if status == 'no_show':
             plan = current_plan(patient)
             if plan and 'missed_appointment' in plan.rules:

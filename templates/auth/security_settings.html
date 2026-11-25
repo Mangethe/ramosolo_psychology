@@ -1,0 +1,50 @@
+{% extends 'portal.html' %}
+{% macro proof(recovery=false, optional_code=false) -%}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Current password <input type="password" name="password" autocomplete="current-password" maxlength="512" required></label>
+  {% if has_factor and not optional_code %}
+  <label>{{ 'Authenticator or recovery code' if recovery else 'Current authenticator code' }} <input name="code" autocomplete="one-time-code" maxlength="{{ 22 if recovery else 6 }}" required></label>
+  {% endif %}
+{%- endmacro %}
+{% block content %}
+<h1>Account security</h1>
+<p>Sign-in email {{ current_user.email }}</p>
+{% if phone_enabled %}<p><a href="{{ url_for('auth.phone_settings') }}">Verify a phone number</a></p>{% endif %}
+<section class="panel">
+  <h2>Authenticator app</h2>
+  <p>{{ 'An authenticator app is configured.' if has_factor else 'Add an authenticator app to protect your account.' }}</p>
+  <form method="post" class="form-grid">
+    {{ proof(has_factor, recent_recovery) }}
+    <div><button class="button" name="action" value="{{ 'replace' if has_factor else 'enroll' }}">{{ 'Replace authenticator' if has_factor else 'Set up authenticator' }}</button></div>
+  </form>
+  {% if has_factor and not required %}
+  <form method="post" class="form-grid">{{ proof() }}<div><button name="action" value="disable">Disable authenticator</button></div></form>
+  {% endif %}
+</section>
+<section class="panel">
+  <h2>Change sign-in email</h2>
+  <form method="post" class="form-grid">
+    {{ proof() }}
+    <label>New email <input type="email" name="new_email" autocomplete="email" required maxlength="254"></label>
+    <div><button class="button" name="action" value="email">Send confirmation</button></div>
+  </form>
+</section>
+<section class="panel">
+  <h2>Change password</h2>
+  <form method="post" class="form-grid">
+    {{ proof() }}
+    <label>New password <input type="password" name="new_password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+    <label>Confirm password <input type="password" name="confirm_password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+    <div><button class="button" name="action" value="password">Change password</button></div>
+  </form>
+</section>
+{% if sso_enabled %}
+<section class="panel">
+  <h2>Link your identity provider</h2>
+  <form method="post" action="{{ url_for('sso.begin') }}" class="form-grid">
+    {{ proof() }}
+    <div><button class="button" name="action" value="link">Link identity provider</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

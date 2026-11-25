@@ -127,11 +127,12 @@ def guest_proposal(token):
     db.session.refresh(appointment);db.session.refresh(proposal)
     if proposal.expires_at<=utcnow() or proposal.state!='pending':abort(410)
     if proposal.verification_attempts>=5:abort(429)
-    from coordination_services import communication_allowed, latest_decision
+    from coordination_services import latest_decision, verified_communication_allowed
     # Withdrawal/destination changes invalidate optional guest delivery at response time too.
-    if not communication_allowed(patient.id,'administrative_contact','email'):abort(403)
-    decision=latest_decision(patient.id,'administrative_contact','email')
-    if not decision or decision.id!=proposal.communication_decision_id:abort(403)
+    decision = latest_decision(patient.id, 'administrative_contact', 'email',
+                               institution_id=proposal.institution_id)
+    if not verified_communication_allowed(decision) or decision.id != proposal.communication_decision_id:
+        abort(403)
     proposal.verification_attempts+=1
     if not secrets.compare_digest(digest(request.form.get('code','')),proposal.code_digest):
         db.session.commit();abort(403)

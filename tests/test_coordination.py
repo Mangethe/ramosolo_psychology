@@ -87,9 +87,11 @@ def test_attempt_contact_success_and_completion_are_distinct(env):
 
 
 def test_cover_reassignment_history_and_stale_updates(env):
+    from models import AccountVerification
     policy(env);row=discharged(env);plan_discharge(env,row)
     cover=User(name='Synthetic cover',email='cover@example.test',password_hash='not-a-login',session_version=1)
     db.session.add(cover);db.session.flush();env[1]['cover']=cover
+    db.session.add(AccountVerification(user_id=cover.id, verified_email=cover.email, verified_at=1))
     db.session.add(Membership(user_id=cover.id,institution_id=env[2][0].institution_id,role='nurse'))
     db.session.add(CareAssignment(patient_id=env[2][0].id,nurse_id=cover.id));db.session.commit()
     path=f'/med/admissions/{env[4].id}/follow-up';old=row.version

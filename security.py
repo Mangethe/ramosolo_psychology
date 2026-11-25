@@ -1,13 +1,12 @@
 """Browser-facing boundaries. No credentials or clinical text in diagnostics."""
 from pathlib import Path
-import time
 from urllib.parse import urlsplit
 from flask import Flask, abort, g, request, session, send_file
 
 
 # Explicit release inventory, not a suffix allowlist. Add reviewed frontend assets
 # here when needed; source maps, uploads and arbitrary files are never public.
-PUBLIC_ASSETS = {'css/style.css': 'text/css'}
+PUBLIC_ASSETS = {'css/style.css': 'text/css', 'js/session-warning.js': 'text/javascript'}
 
 
 class SecureFlask(Flask):
@@ -31,19 +30,13 @@ class SecureFlask(Flask):
             exc_info[0].__name__,request.endpoint or 'unmatched')
 
 
-def stamp_login():
-    session['_auth_started_at']=int(time.time())
-    session['_auth_last_seen']=int(time.time())
-
-
-def valid_login_clock(app):
-    now=int(time.time());start=session.get('_auth_started_at');last=session.get('_auth_last_seen')
-    return (type(start) is int and type(last) is int and start<=last<=now
-        and now-start<app.config['PERMANENT_SESSION_LIFETIME'].total_seconds()
-        and now-last<app.config['AUTH_IDLE_TIMEOUT'].total_seconds())
-
-
 def configure_security(app):
+    warning = app.config['AUTH_WARNING_SECONDS']
+    if not 0 < warning < min(app.config['AUTH_IDLE_TIMEOUT'].total_seconds(),
+                             app.config['PERMANENT_SESSION_LIFETIME'].total_seconds()):
+        raise RuntimeError('The session warning must be shorter than both session timeouts.')
+    if not app.config['AUTH_REQUIRE_STAFF_MFA'] and (app.config['PRODUCTION'] or not app.testing):
+        raise RuntimeError('Staff authenticator approval is mandatory outside synthetic tests.')
     if app.config['PRODUCTION']:
         if app.debug or app.config.get('TRAP_HTTP_EXCEPTIONS') or app.config.get('PROPAGATE_EXCEPTIONS'):
             raise RuntimeError('Production debugging and exception propagation must be disabled.')
@@ -59,6 +52,11 @@ def configure_security(app):
 
     @app.before_request
     def browser_boundary():
+        # Never reuse authentication from a containing application context.
+        g.pop('_login_user', None)
+        g.pop('portal_session', None)
+        g.pop('csrf_token', None)
+        g.pop('csrf_valid', None)
         if app.config['PRODUCTION']:
             if app.debug or not request.is_secure:
                 abort(400)  # the TLS edge handles HTTP redirects, before accepting bodies
@@ -69,13 +67,6 @@ def configure_security(app):
                 if parsed.scheme not in ('http','https') or origin.rstrip('/')!=request.host_url.rstrip('/'):
                     abort(403)
             if request.headers.get('Sec-Fetch-Site')=='cross-site':abort(403)
-        # Fail closed on legacy/malformed/expired login cookies. Only IDs, clock
-        # values, CSRF and generic UI messages belong in the signed cookie.
-        if '_user_id' in session:
-            now=int(time.time());last=session.get('_auth_last_seen')
-            if not valid_login_clock(app):
-                session.clear();session['_remember']='clear';g.pop('_login_user',None)
-            elif now-last>=60:session['_auth_last_seen']=now
 
     @app.after_request
     def browser_headers(response):

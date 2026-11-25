@@ -194,6 +194,7 @@ def preferences():
     patients = list(db.session.scalars(patient_scope()))
     if request.method == 'POST':
         patient = accessible_patient(request.form.get('patient_id', type=int))
+        db.session.refresh(patient, with_for_update=True)
         channels = request.form.getlist('channels')
         consent = request.form.get('communication_consent')
         if consent not in ('yes', 'no') or any(c not in ('phone','email','sms','portal') for c in channels) or (consent == 'yes' and not channels):

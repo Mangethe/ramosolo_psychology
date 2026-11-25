@@ -134,19 +134,26 @@ def test_escape_html_and_do_not_redirect_sensitive_queries(env):
 
 
 def test_real_login_expiry_idle_absolute_and_cookie_payload(env):
+    import portal_sessions
+    from models import PortalSession
+
     app=env[0];client=app.test_client()
     assert client.post('/auth/login',data={'email':'dr@example.test','password':'Testing-password-123'}).status_code==302
     assert client.get('/med').status_code==200
     with client.session_transaction() as s:
-        assert '_auth_started_at' in s and '_auth_last_seen' in s
         assert '_user_id' in s and not any('clinical' in key for key in s)
-        s['_auth_started_at']=int(time.time())-2*3600;s['_auth_last_seen']=int(time.time())
+        row = db.session.get(PortalSession, portal_sessions.digest(s['portal_token']))
+    row.absolute_expires_at = portal_sessions.clock()
+    db.session.commit()
     assert client.get('/med').status_code==302
     client=as_user(env,'dr')
-    with client.session_transaction() as s:s['_auth_last_seen']=int(time.time())-31*60
+    with client.session_transaction() as s:
+        row = db.session.get(PortalSession, portal_sessions.digest(s['portal_token']))
+    row.idle_expires_at = portal_sessions.clock()
+    db.session.commit()
     assert client.get('/med').status_code==302
     client=as_user(env,'dr')
-    with client.session_transaction() as s:s.pop('_auth_started_at')
+    with client.session_transaction() as s:s.pop('portal_token')
     assert client.get('/med').status_code==302
 
 
