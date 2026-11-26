@@ -15,12 +15,34 @@ instance/
 *.db
 *.sqlite
 *.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
 .booking-test-postgres/
+pgdata/
+.postgres-data/
 
 # Dependencies, logs and private uploads
 node_modules/
 *.log
 uploads/
+private_uploads/
+backups/
+*.backup
+*.dump
+*.bak
+*.sql.gz
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.pem
+*.key
+*.pfx
+*.p12
+credentials.json
+service-account*.json
+client_secret*.json
 
 # Local fix bundle
 booking-login-fix/

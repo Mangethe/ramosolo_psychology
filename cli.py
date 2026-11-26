@@ -3,6 +3,7 @@ from datetime import timedelta
 import click
 from flask import current_app
 from sqlalchemy import select, text, inspect
+from sqlalchemy.exc import SQLAlchemyError
 from extensions import db
 from models import User, Institution, Membership, Patient, Appointment, Admission, CareAssignment, ROLES
 from medical_services import utcnow
@@ -15,7 +16,7 @@ def register_commands(app):
     def deliver_email(live, limit):
         """Drain portal email using the fake transport by default."""
         from mail_delivery import GmailProvider
-        from security_email import FakeMailProvider, deliver_pending
+        from security_email import FakeMailProvider, deliver_with_run
         if live:
             if (current_app.testing or db.engine.dialect.name != 'postgresql'
                     or current_app.config['MAIL_PROVIDER'] == 'fake'):
@@ -30,8 +31,11 @@ def register_commands(app):
             if current_app.config['PRODUCTION'] or db.engine.dialect.name != 'sqlite':
                 raise click.ClickException('Fake delivery is for disposable synthetic SQLite outboxes.')
             provider = FakeMailProvider()
-        count = deliver_pending(provider, limit=limit)
-        click.echo(f'Provider accepted: {count}' if live else f'Synthetic messages processed: {count}')
+        try:
+            report = deliver_with_run(provider, limit=limit)
+            click.echo(f'run={report.id} status={report.state} counters={report.counts}')
+        except SQLAlchemyError:
+            raise click.ClickException('Email worker database operation failed. Review the run ledger.') from None
 
     @app.cli.command('start-assisted-recovery')
     @click.option('--institution-id', type=int, required=True)

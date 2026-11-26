@@ -3,7 +3,9 @@ from extensions import db
 
 class Patient(db.Model):
     __tablename__ = 'patients'
-    __table_args__ = (db.UniqueConstraint('institution_id', 'user_id'),)
+    __table_args__ = (db.UniqueConstraint('institution_id', 'user_id'),
+        db.UniqueConstraint('id', 'institution_id', name='patient_institution_identity'),
+        db.Index('ix_patients_institution_doctor', 'institution_id', 'doctor_id'))
     id = db.Column(db.Integer, primary_key=True)
     institution_id = db.Column(db.Integer, db.ForeignKey('institutions.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -16,7 +18,8 @@ class Patient(db.Model):
 
 class CareAssignment(db.Model):
     __tablename__ = 'care_assignments'
-    __table_args__ = (db.UniqueConstraint('patient_id', 'nurse_id'),)
+    __table_args__ = (db.UniqueConstraint('patient_id', 'nurse_id'),
+        db.Index('ix_care_assignments_nurse_patient', 'nurse_id', 'patient_id'))
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
     nurse_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -25,6 +28,8 @@ class CareAssignment(db.Model):
 class Appointment(db.Model):
     __tablename__ = 'appointments'
     __table_args__ = (db.CheckConstraint("status in ('scheduled','held','expired','completed','cancelled','no_show')"),
+        db.ForeignKeyConstraint(['patient_id', 'institution_id'], ['patients.id', 'patients.institution_id'],
+                                name='appointment_patient_institution_fkey'),
         db.Index('one_patient_slot', 'patient_id', 'starts_at', unique=True, sqlite_where=db.text("status != 'cancelled'"), postgresql_where=db.text("status != 'cancelled'")),
         db.Index('one_doctor_slot', 'doctor_id', 'starts_at', unique=True, sqlite_where=db.text("status != 'cancelled'"), postgresql_where=db.text("status != 'cancelled'")))
     id = db.Column(db.Integer, primary_key=True)
@@ -40,7 +45,7 @@ class Appointment(db.Model):
     schedule_version = db.Column(db.Integer, nullable=False, default=1)
     hold_expires_at = db.Column(db.DateTime)
     institution_id = db.Column(db.Integer, db.ForeignKey('institutions.id'))
-    patient = db.relationship('Patient')
+    patient = db.relationship('Patient', foreign_keys=[patient_id])
 
 
 class Admission(db.Model):

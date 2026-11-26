@@ -5,6 +5,7 @@ from flask import current_app
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import load_only
 
 from coordination_services import latest_decision, verified_communication_allowed
 from extensions import db
@@ -37,8 +38,9 @@ def current_recipient(patient, kind, *, check_window=False):
     if patient.email and patient.email.lower() != destination.lower():
         return None
     if patient.user_id:
-        user = db.session.get(User, patient.user_id)
-        verified = db.session.get(AccountVerification, patient.user_id)
+        user = db.session.execute(select(User.email, User.enabled).where(User.id == patient.user_id)).first()
+        verified = db.session.execute(select(AccountVerification.verified_at, AccountVerification.verified_email)
+                                      .where(AccountVerification.user_id == patient.user_id)).first()
         membership = db.session.scalar(select(Membership.id).where(Membership.user_id == patient.user_id,
             Membership.institution_id == patient.institution_id, Membership.role == 'patient',
             Membership.enabled.is_(True)))
@@ -100,18 +102,22 @@ def render(job, origin):
     if context is None:
         return None
     expected = 'cancelled' if job.kind == 'appt_cancelled' else 'scheduled'
-    row = db.session.scalar(select(Appointment).where(Appointment.id == context.appointment_id,
+    # Match the portal's patient-then-appointment lock order.
+    patient = db.session.scalar(select(Patient).options(load_only(Patient.institution_id, Patient.user_id,
+        Patient.email, raiseload=True)).join(Institution).where(Patient.id == context.patient_id,
+        Patient.institution_id == context.institution_id, Institution.kind == 'medical').with_for_update(of=Patient))
+    if not patient or patient.user_id != job.user_id:
+        return None
+    starts_at = db.session.scalar(select(Appointment.starts_at).where(Appointment.id == context.appointment_id,
         Appointment.patient_id == context.patient_id, Appointment.status == expected,
         (Appointment.institution_id == context.institution_id) | Appointment.institution_id.is_(None),
         Appointment.schedule_version == context.schedule_version, Appointment.starts_at == context.scheduled_start
     ).with_for_update())
-    patient = db.session.scalar(select(Patient).join(Institution).where(Patient.id == context.patient_id,
-        Patient.institution_id == context.institution_id, Institution.kind == 'medical').with_for_update(of=Patient))
-    if not row or not patient or patient.user_id != job.user_id:
+    if starts_at is None:
         return None
     if job.kind == 'appt_reminder' and context.lead_minutes != current_app.config['APPOINTMENT_EMAIL_REMINDER_MINUTES']:
         return None
-    if expected == 'scheduled' and row.starts_at <= utcnow():
+    if expected == 'scheduled' and starts_at <= utcnow():
         return None
     chosen = current_recipient(patient, job.kind, check_window=True)
     if not chosen or chosen[0].id != context.decision_id or chosen[1] != job.recipient:
@@ -120,6 +126,6 @@ def render(job, origin):
     details = latest_decision(patient.id, chosen[0].purpose, 'email', 'appointment_details',
                               institution_id=patient.institution_id)
     if verified_communication_allowed(details) and details.scope == 'appointment_details' and details.destination == job.recipient:
-        start = row.starts_at.replace(tzinfo=timezone.utc).astimezone(TZ)
+        start = starts_at.replace(tzinfo=timezone.utc).astimezone(TZ)
         body += f' Scheduled time {start:%Y-%m-%d %H:%M %Z}.'
     return subject, f'{body}\n\nFor the latest information, visit {origin}/auth/login or contact the practice.'

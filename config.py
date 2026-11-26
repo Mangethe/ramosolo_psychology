@@ -38,12 +38,10 @@ def settings():
         raise RuntimeError('Production requires PostgreSQL. SQLite is for local demos.')
     if production and os.getenv('FLASK_DEBUG','').lower() not in ('','0','false','no','off'):
         raise RuntimeError('FLASK_DEBUG must be disabled in production.')
-    if production and os.getenv('FLASK_DEBUG','').lower() not in ('','0','false','no','off'):
-        raise RuntimeError('FLASK_DEBUG must be disabled in production.')
     engine = {'pool_pre_ping': True}
     if url.startswith('postgresql+'):
-        # Poolers may ignore startup options. The engine checkout hook applies
-        # search_path on every physical connection, so don't depend on options.
+        # Poolers may ignore startup options. The engine sets the schema for
+        # each transaction, including after a rollback on the same connection.
         engine['connect_args'] = {'connect_timeout': 10}
         if production and parsed_url.query.get('sslmode') not in ('require','verify-ca','verify-full'):
             raise RuntimeError('Production database connections require an explicit secure sslmode.')

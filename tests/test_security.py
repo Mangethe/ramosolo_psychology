@@ -1,4 +1,5 @@
 """Synthetic leak canaries only; never load real credentials or patient files."""
+import csv
 from datetime import timedelta
 from html.parser import HTMLParser
 from pathlib import Path
@@ -48,6 +49,16 @@ def test_direct_urls_response_source_and_exports_do_not_leak(env,role):
         assert 'Access-Control-Allow-Origin' not in r.headers
     r=client.post('/med/exports',data={'resource':'diagnoses','patient_id':foreign.id})
     assert r.status_code in (302,403,404) and CLINICAL.encode() not in r.data
+    if role == 'dr':
+        patient = env[2][0]
+        contents = ('\tSynthetic content', '  ＝1+1', '\ufeff=1+1', 'Ordinary synthetic content')
+        db.session.add_all(ClinicalRecord(institution_id=patient.institution_id, patient_id=patient.id,
+            author_id=env[1]['dr'].id, kind='diagnoses', content=content) for content in contents)
+        db.session.commit()
+        export = client.post('/med/exports', data={'resource': 'diagnoses', 'patient_id': patient.id})
+        assert export.status_code == 200 and export.headers['Cache-Control'] == 'no-store'
+        cells = {row['clinician_authored_content'] for row in csv.DictReader(export.get_data(as_text=True).splitlines())}
+        assert {"'" + content for content in contents[:3]} | {contents[3]} <= cells
     if role:
         with client.session_transaction() as s:
             assert SECRET not in repr(dict(s)) and CLINICAL not in repr(dict(s))

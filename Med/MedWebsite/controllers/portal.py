@@ -1,11 +1,12 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta, timezone
 from flask import render_template, request, redirect, url_for, flash, g, abort
 from flask_login import current_user, login_required
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import Patient, Appointment, Admission, Membership, CareAssignment, User
-from access import require_roles, require_capability, patient_scope, accessible_patient, audit, audit_views, ROLE_MATRIX
+from access import (appointment_institution, require_roles, require_capability, patient_scope,
+                    accessible_patient, audit, audit_views, ROLE_MATRIX)
 from medical_services import SERVICES, utcnow, parse_local, statistics, doctors, TZ
 from . import bp
 from continuity_services import current_plan, record_event, archive_events
@@ -13,6 +14,7 @@ from continuity_services import current_plan, record_event, archive_events
 ALL = tuple(ROLE_MATRIX)
 STAFF = tuple(role for role, permissions in ROLE_MATRIX.items() if 'operational' in permissions)
 SCHEDULERS = tuple(role for role, permissions in ROLE_MATRIX.items() if 'schedule' in permissions)
+DASHBOARD_PERIODS = ((1, 'Today'), (7, '7 days'), (14, '14 days'))
 
 
 def locked_appointment(appointment_id):
@@ -22,7 +24,8 @@ def locked_appointment(appointment_id):
     if not patient:
         abort(404)
     appointment = db.session.scalar(select(Appointment).where(
-        Appointment.id == appointment_id, Appointment.patient_id == patient.id).with_for_update())
+        Appointment.id == appointment_id, Appointment.patient_id == patient.id,
+        appointment_institution(patient.institution_id)).with_for_update())
     if not appointment:
         abort(404)
     return patient, appointment
@@ -33,19 +36,51 @@ def locked_appointment(appointment_id):
 def dashboard():
     if not g.membership or g.membership.institution.kind != 'medical':
         return render_template('institutions/unavailable.html')
-    patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    stats, latest, admitted = statistics(patients,include_admissions=g.membership.role!='dr_assist')
-    ids = [p.id for p in patients]
     now = utcnow()
-    appointments = list(db.session.scalars(select(Appointment).where(Appointment.patient_id.in_(ids),
-        Appointment.status == 'scheduled', Appointment.starts_at >= now).order_by(Appointment.starts_at).limit(8)))
-    reminders = [a for a in appointments if a.starts_at <= now + timedelta(days=7)]
-    audit_views('appointment', appointments)
+    today = now.replace(tzinfo=timezone.utc).astimezone(TZ).date()
+    period = request.args.get('period', default=7, type=int)
+    if period not in {days for days, _ in DASHBOARD_PERIODS}:
+        period = 7
+    days = [today + timedelta(days=offset) for offset in range(period)]
+    boundaries = [datetime.combine(day, time.min, TZ).astimezone(timezone.utc).replace(tzinfo=None)
+                  for day in (*days, today + timedelta(days=period))]
+    requested_day = request.args.get('day')
+    selected = next((index for index, day in enumerate(days) if day.isoformat() == requested_day), None)
+
+    scope = patient_scope()
+    upcoming = select(Appointment).where(Appointment.patient_id.in_(scope.with_only_columns(Patient.id)),
+        appointment_institution(g.membership.institution_id), Appointment.status == 'scheduled',
+        Appointment.starts_at >= now)
+    # SQL returns counts per Johannesburg day without exporting appointment records for the chart.
+    bucket = case(*[(Appointment.starts_at < end, index) for index, end in enumerate(boundaries[1:-1])],
+                  else_=period - 1) if period > 1 else None
+    within_period = upcoming.where(Appointment.starts_at < boundaries[-1])
+    if bucket is None:
+        counts = {0: db.session.scalar(within_period.with_only_columns(func.count(Appointment.id)))}
+    else:
+        counts = dict(db.session.execute(within_period.with_only_columns(bucket.label('day_bucket'),
+            func.count(Appointment.id)).group_by('day_bucket')).all())
+    chart = [(day, counts.get(index, 0)) for index, day in enumerate(days)]
+    if selected is not None:
+        within_period = within_period.where(Appointment.starts_at >= boundaries[selected],
+                                            Appointment.starts_at < boundaries[selected + 1])
+    appointments = list(db.session.scalars(within_period.order_by(Appointment.starts_at, Appointment.id).limit(8)))
+    is_patient = g.membership.role == 'patient'
+    next_appointment = db.session.scalar(upcoming.order_by(Appointment.starts_at, Appointment.id).limit(1)) if is_patient else None
+    stats = None if is_patient else statistics(list(db.session.scalars(scope)),
+                                               now=now, include_admissions=g.membership.role != 'dr_assist')[0]
+    viewed = {appointment.id: appointment for appointment in appointments}
+    if next_appointment:
+        viewed[next_appointment.id] = next_appointment
+    audit_views('appointment', viewed.values())
     titles = {'dr': 'Your practice, at a glance', 'nurse': 'Your care dashboard',
               'dr_assist': 'Keep the day running smoothly', 'admin': 'Your practice overview',
               'patient': 'A little clarity for your next step'}
     return render_template('medical/dashboard.html', stats=stats, appointments=appointments,
-        reminders=reminders, title=titles[g.membership.role], now=now, services=SERVICES)
+        next_appointment=next_appointment, title=titles[g.membership.role], now=now,
+        periods=DASHBOARD_PERIODS, period=period, selected_day=days[selected] if selected is not None else None,
+        chart=chart, chart_max=max(1, max(count for _, count in chart)), chart_total=sum(counts.values()),
+        list_total=counts.get(selected, 0) if selected is not None else sum(counts.values()))
 
 
 @bp.get('/med/patients')
@@ -93,8 +128,9 @@ def create_patient():
 def patient_detail(patient_id):
     patient = accessible_patient(patient_id)
     appointments = list(db.session.scalars(select(Appointment).where(
-        Appointment.patient_id == patient.id).order_by(Appointment.starts_at.desc())))
-    
+        Appointment.patient_id == patient.id, appointment_institution(patient.institution_id))
+        .order_by(Appointment.starts_at.desc())))
+
     admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
         Admission.patient_id == patient.id).order_by(Admission.admitted_at.desc())))
     audit('view', 'patient', patient.id)
@@ -131,9 +167,8 @@ def assign_nurse(patient_id):
 @require_roles(*ALL)
 def appointments():
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    query = select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]))
-    if g.membership.role=='dr_assist':
-        query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
+    query = select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]),
+        appointment_institution(g.membership.institution_id))
     if g.membership.role=='dr_assist':
         query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
     rows = list(db.session.scalars(query.order_by(Appointment.starts_at.desc())))
@@ -141,18 +176,10 @@ def appointments():
     from models import AppointmentProposal
     proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
     return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES,proposals=proposals)
-    audit_views('appointment', rows)
-    from models import AppointmentProposal
-    proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
-    return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES,proposals=proposals)
-
-
 @bp.post('/med/appointments')
 @require_roles(*SCHEDULERS)
 def create_appointment():
     patient = accessible_patient(request.form.get('patient_id', type=int))
-    from scheduling_services import lock_doctor, validate_slot, history
-    lock_doctor(patient.doctor_id,patient.institution_id)
     from scheduling_services import lock_doctor, validate_slot, history
     lock_doctor(patient.doctor_id,patient.institution_id)
     try:

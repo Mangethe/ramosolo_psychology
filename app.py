@@ -19,21 +19,14 @@ def sqlite_foreign_keys(connection, _):
         cursor.close()
 
 
-def postgres_schema_on_checkout(dbapi_connection, connection_record, connection_proxy):
-    """Reset pooled PostgreSQL connections to this app's validated schema."""
-    schema = connection_record.info.get('ramosolo_schema')
-    if not schema:
-        return
-    cursor = dbapi_connection.cursor()
-    try:
-        # Identifier was validated as lowercase [a-z][a-z0-9_]* in config.
-        cursor.execute(f'SET SESSION search_path TO "{schema}", public')
-    finally:
-        cursor.close()
+def postgres_schema_on_begin(connection, schema):
+    """Set the validated schema for each transaction, including pooler reuse."""
+    connection.exec_driver_sql(f'SET LOCAL search_path TO "{schema}", public')
 
 
 def create_app(test_config=None):
-    load_dotenv()
+    if os.getenv('APP_ENV') != 'production':
+        load_dotenv()
     app = SecureFlask(__name__)
     app.config.update(settings())
     if test_config:
@@ -52,10 +45,9 @@ def create_app(test_config=None):
             raise RuntimeError('DB_SCHEMA must be a lowercase SQL identifier.')
         with app.app_context():
             engine = db.engine
-            @event.listens_for(engine, 'connect')
-            def tag_postgres_connection(dbapi_connection, connection_record):
-                connection_record.info['ramosolo_schema'] = schema
-            event.listen(engine, 'checkout', postgres_schema_on_checkout)
+            @event.listens_for(engine, 'begin')
+            def set_schema(connection):
+                postgres_schema_on_begin(connection, schema)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please sign in to access your portal.'

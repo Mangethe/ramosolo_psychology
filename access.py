@@ -3,7 +3,7 @@ from flask import abort, g, session
 from flask_login import current_user
 from sqlalchemy import select, false
 from extensions import db
-from models import Membership, Patient, CareAssignment, AuditEvent, User, PatientPermission
+from models import Appointment, Membership, Patient, CareAssignment, AuditEvent, User, PatientPermission
 
 # Executable matrix. A possible capability still requires the patient/query scope below.
 READ_PERMISSIONS = {
@@ -132,6 +132,12 @@ def accessible_patient(patient_id, permission='operational'):
     if not patient:
         abort(404)
     return patient
+
+
+def appointment_institution(institution_id):
+    # SQLite and older local records can omit the redundant appointment scope.
+    # The caller still has to check the authoritative patient institution.
+    return (Appointment.institution_id == institution_id) | Appointment.institution_id.is_(None)
 
 
 def audit(action, resource, resource_id):

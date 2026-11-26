@@ -84,6 +84,37 @@ def test_each_role_dashboard(env,role):
         assert b'Your next appointment'.upper() in r.data
 
 
+def test_dashboard_filters_use_johannesburg_days_and_patient_scope(env, monkeypatch):
+    from Med.MedWebsite.controllers import portal
+
+    # 23:50 on 4 November in Johannesburg. The chart crosses local midnight at 22:00 UTC.
+    now = datetime(2032, 11, 4, 21, 50)
+    monkeypatch.setattr(portal, 'utcnow', lambda: now)
+    patient, other_doctor_patient, foreign_patient = env[2]
+    for person, minute, service in ((patient, 5, 'Synthetic late service'),
+            (patient, 15, 'Synthetic morning service'),
+            (other_doctor_patient, 20, 'Synthetic unassigned service'),
+            (foreign_patient, 25, 'Synthetic foreign service')):
+        db.session.add(Appointment(patient_id=person.id, doctor_id=person.doctor_id,
+            institution_id=person.institution_id, starts_at=now + timedelta(minutes=minute),
+            service=service, status='scheduled'))
+    db.session.commit()
+
+    doctor = as_user(env, 'dr')
+    today = doctor.get('/med?period=1')
+    assert b'Synthetic late service' in today.data and b'Synthetic morning service' not in today.data
+    tomorrow = doctor.get('/med?period=7&day=2032-11-05')
+    assert b'Synthetic morning service' in tomorrow.data and b'Synthetic late service' not in tomorrow.data
+    assert b'Friday 05 November, 1 scheduled' in tomorrow.data and b'aria-current="date"' in tomorrow.data
+    assert b'Synthetic unassigned service' not in tomorrow.data and b'Synthetic foreign service' not in tomorrow.data
+    assert b'Synthetic late service' in doctor.get('/med?period=900&day=1999-01-01').data
+
+    patient_view = as_user(env, 'patient').get('/med?period=14&day=2032-11-05').data
+    assert b'Synthetic morning service' in patient_view and b'Synthetic late service' in patient_view
+    assert b'YOUR NEXT APPOINTMENT' in patient_view and b'Patient overview' not in patient_view
+    assert b'Synthetic unassigned service' not in patient_view and b'Synthetic foreign service' not in patient_view
+
+
 @pytest.mark.parametrize('role',['dr','nurse','dr_assist'])
 def test_staff_assignment_scope(env,role):
     client=as_user(env,role)

@@ -35,23 +35,15 @@ def test_supabase_url_alias_prevents_silent_sqlite_fallback(monkeypatch):
         db.engine.dispose()
 
 
-def test_schema_checkout_hook_resets_session_on_every_checkout():
-    from app import postgres_schema_on_checkout
-    class Cursor:
-        def __init__(self): self.statements = []
-        def execute(self, statement): self.statements.append(statement)
-        def close(self): pass
+def test_schema_begin_hook_sets_transaction_local_path():
+    from app import postgres_schema_on_begin
     class Connection:
-        def __init__(self): self.cursor_value = Cursor()
-        def cursor(self): return self.cursor_value
-    class Record:
-        info = {'ramosolo_schema': 'ramosolo'}
+        def __init__(self): self.statements = []
+        def exec_driver_sql(self, statement): self.statements.append(statement)
     connection = Connection()
-    postgres_schema_on_checkout(connection, Record(), None)
-    postgres_schema_on_checkout(connection, Record(), None)
-    assert connection.cursor_value.statements == [
-        'SET SESSION search_path TO "ramosolo", public',
-        'SET SESSION search_path TO "ramosolo", public']
+    postgres_schema_on_begin(connection, 'ramosolo')
+    postgres_schema_on_begin(connection, 'ramosolo')
+    assert connection.statements == ['SET LOCAL search_path TO "ramosolo", public'] * 2
 
 
 @pytest.mark.parametrize('schema', ['bad-name', 'UpperCase', 'x;DROP_SCHEMA'])

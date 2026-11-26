@@ -376,6 +376,50 @@ input::placeholder{color:#64758a}
 .skip:focus{position:fixed;top:12px;left:12px;z-index:1000;color:var(--deep);border:2px solid #155c9f}
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.table-wrap:focus-visible{outline:3px solid #0b65b9;outline-offset:4px}
 section[id]{scroll-margin-top:24px}
+.practice-board{display:grid;gap:24px;max-width:1420px;margin-inline:auto}
+.board-hero{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;padding:clamp(22px,4vw,42px);border-radius:12px;background:linear-gradient(112deg,#123454,#184c67 69%,#17626a);color:#fff}
+.board-hero .eyebrow,.board-hero p{color:#e0eff5;margin:0}
+.board-hero h1{margin:.35rem 0;color:inherit}
+.board-hero .button{background:#fff;color:#153b57;border-color:#fff;box-shadow:none}
+.board-hero .button:hover{background:#e6f4f6}
+.board-hero a:focus-visible{outline-color:#fff}
+.board-layout{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(260px,1fr);gap:22px;align-items:start}
+.board-schedule,.board-overview{min-width:0;margin:0;border-radius:12px;padding:clamp(16px,2.3vw,28px)}
+.board-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+.board-heading h2,.board-heading h3,.board-overview h2{margin:0}
+.board-heading p,.board-overview>p{margin:.4rem 0 0}
+.board-periods{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:#edf3f7;border-radius:8px}
+.board-periods a{display:grid;place-items:center;padding:0 .65rem;min-height:44px;border-radius:5px;font-size:.875rem;font-weight:700;color:#34566e;white-space:nowrap}
+.board-periods a:hover,.board-periods a[aria-current]{background:#fff;color:#154f69;box-shadow:0 1px 3px #12345424}
+.board-chart{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:22px;padding:8px;background:#f2f7fa;border-radius:9px}
+.board-day{display:grid;justify-items:center;gap:3px;padding:8px 0;border:1px solid transparent;border-radius:6px;text-decoration:none;color:#365872;font-size:.875rem;font-variant-numeric:tabular-nums}
+.board-day:hover,.board-day[aria-current=date]{border-color:#91b9c4;background:#fff;color:#104e59}
+.board-day strong{color:#153b57}
+.board-day time{font-weight:700}
+.board-bar{position:relative;height:62px;width:14px}
+.board-bar meter{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);width:62px;height:12px;appearance:none;background:#dae6ed;border:0;border-radius:8px}
+.board-bar meter::-webkit-meter-bar{background:#dae6ed;border:0;border-radius:8px}
+.board-bar meter::-webkit-meter-optimum-value{background:#267982;border-radius:8px}
+.board-bar meter::-moz-meter-bar{background:#267982;border-radius:8px}
+.board-day[aria-current=date] meter::-webkit-meter-optimum-value{background:#114b59}
+.board-agenda{margin-top:22px;padding-top:20px;border-top:1px solid var(--border)}
+.board-appointments{margin:10px 0 0;padding:0;list-style:none}
+.board-appointments li{display:grid;grid-template-columns:minmax(85px,115px) minmax(0,1fr);gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.board-appointments li:last-child{border-bottom:0;padding-bottom:0}
+.board-appointments span{display:block;margin-top:3px;color:#50677c;font-size:.875rem}
+.board-patient{display:block;width:fit-content;margin-top:4px;font-size:.875rem}
+.board-slot{font-variant-numeric:tabular-nums}
+.board-agenda .empty{margin:14px 0 0}
+.board-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:10px;margin-top:16px}
+.board-metric{padding:13px;border-radius:8px;background:#f3f7fa;overflow-wrap:anywhere}
+.board-metric-primary{background:#e5f4f3}
+.board-metric .metric-label{display:block;font-size:.875rem;letter-spacing:0;text-transform:none;color:#21435a}
+.board-metric>strong{display:block;margin-top:6px;color:#123c58;font-size:1.8rem;line-height:1.1}
+.board-metric p{margin:.4rem 0 0;color:#50677c;font-size:.875rem;line-height:1.35}
+.board-patients-link{display:inline-flex;align-items:center;min-height:44px;margin-top:8px}
+.board-next-date{font-size:1.35rem;font-weight:700;color:#153b57}
+@media(max-width:1170px){.board-layout{grid-template-columns:1fr}}
+@media(max-width:480px){.practice-board,.board-layout{gap:14px}.board-chart{gap:2px;padding:4px}.board-day{font-size:.75rem}.board-bar{height:50px}.board-bar meter{width:50px}}
 .policy-page{max-width:880px}
 .policy-page h1{overflow-wrap:anywhere}
 .policy-page h2{font-size:1.55rem;letter-spacing:-.025em}

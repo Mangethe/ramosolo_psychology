@@ -14,6 +14,7 @@ import pytest
 import psycopg
 from psycopg import sql
 from sqlalchemy import select, func, create_engine, inspect, text
+from sqlalchemy.exc import ProgrammingError
 from app import create_app
 from extensions import db
 from models import (AccountVerification, User, Institution, Membership, Patient, CareAssignment, CarePlan,
@@ -27,6 +28,7 @@ AUTH_TABLES = {'portal_sessions', 'account_verifications', 'security_emails', 'a
                'auth_recovery_codes', 'pending_authentications', 'federated_identities', 'oidc_exchanges',
                'account_recoveries'}
 DELIVERY_TABLES = {'appointment_emails', 'delivery_limits', 'verified_phones', 'phone_challenges'}
+PIPELINE_TABLES = {'email_delivery_runs'}
 
 
 def test_factory_cli_schema_after_rollback_and_connection_reuse(isolated_database):
@@ -47,6 +49,7 @@ def test_factory_cli_schema_after_rollback_and_connection_reuse(isolated_databas
                 physical = connection.connection.driver_connection
                 assert connection.scalar(text('SELECT current_schema()')) == 'ramosolo'
                 connection.rollback()
+                assert connection.scalar(text('SELECT current_schema()')) == 'ramosolo'
             with engine.connect() as connection:
                 assert connection.connection.driver_connection is physical
                 assert connection.scalar(text('SELECT current_schema()')) == 'ramosolo'
@@ -173,7 +176,7 @@ def test_reconciliation_draft_applies_to_reconstructed_production_fixture(isolat
         assert connection.execute('SELECT version FROM ramosolo.schema_versions ORDER BY version').fetchall() == [
             (n,) for n in range(1, 10)]
         orm_columns = {(table.name, column.name) for table in db.metadata.tables.values()
-            if table.name not in AUTH_TABLES | DELIVERY_TABLES for column in table.columns}
+            if table.name not in AUTH_TABLES | DELIVERY_TABLES | PIPELINE_TABLES for column in table.columns}
         fixture_columns = set(connection.execute("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='ramosolo'").fetchall())
         assert orm_columns <= fixture_columns
         assert connection.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema='ramosolo' AND table_type='BASE TABLE'").fetchone()[0] == 51
@@ -418,7 +421,7 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
             assert existing_table_grants(connection)[table][0] == 'postgres'
             assert connection.execute(sql.SQL('SELECT count(*) FROM ramosolo.{}').format(
                 sql.Identifier(table))).fetchone() == (0,)
-        for number in (15, 16):
+        for number in (15, 16, 17):
             connection.execute(migration(number))
         assert existing_projection(connection, tables)[1] == reconciled
         for table in DELIVERY_TABLES:
@@ -430,6 +433,12 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
             assert connection.execute(sql.SQL('SELECT count(*) FROM ramosolo.{}').format(
                 sql.Identifier(table))).fetchone() == (0,)
         connection.execute('RESET ROLE')
+        assert connection.execute("""SELECT conname, convalidated FROM pg_constraint
+            WHERE conrelid = 'ramosolo.appointments'::regclass AND conname IN
+            ('appointment_patient_institution_fkey', 'appointment_request_institution_fkey')
+            ORDER BY conname""").fetchall() == [('appointment_patient_institution_fkey', True),
+                                                ('appointment_request_institution_fkey', True)]
+        connection.execute((ROOT/'verification'/'runtime_roles.sql').read_text(encoding='utf-8'))
 
     app = create_app({'TESTING': True, 'SECRET_KEY': 'synthetic-reconciliation-app',
         'SQLALCHEMY_DATABASE_URI': isolated_database.replace('postgresql://','postgresql+psycopg://',1),
@@ -487,6 +496,14 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
             day += timedelta(days=1)
         db.session.commit()
 
+    from sqlalchemy import event
+    with app.app_context():
+        engine = db.engine
+
+    def use_portal_role(connection):
+        connection.exec_driver_sql('SET LOCAL ROLE ramosolo_app_runtime')
+
+    event.listen(engine, 'begin', use_portal_role)
     client = app.test_client()
     response = client.post('/auth/login', data={
         'email': 'fixture-doctor-a@example.test', 'password': synthetic_password})
@@ -607,9 +624,76 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
     other_calendar = other_institution.get('/med/calendar')
     assert other_calendar.status_code == 200 and b'Synthetic fixture patient C' in other_calendar.data
     assert b'Synthetic fixture patient A' not in other_calendar.data
+    event.remove(engine, 'begin', use_portal_role)
+
+    from security_email import FakeMailProvider, deliver_with_run, enqueue
+    from appointment_email import queue
+    from models import CommunicationDecision
+    with app.app_context():
+        db.session.remove()
+        enqueue(db.session.get(User, 1), 'change', 'synthetic-runtime-mail', detail='Synthetic change')
+        appointment = db.session.get(Appointment, first_appointment_id)
+        patient = appointment.patient
+        app.config['APPOINTMENT_EMAIL_ENABLED'] = True
+        db.session.add(CommunicationDecision(institution_id=patient.institution_id, patient_id=patient.id,
+            purpose='administrative_contact', channel='email', scope='practice', status='granted',
+            destination=patient.user_id and db.session.get(User, patient.user_id).email,
+            verified_at=utcnow(), timezone='Africa/Johannesburg', method='Synthetic',
+            notice_version='test-1', recorded_by_id=1))
+        db.session.flush()
+        queue(appointment, 'appt_confirmed')
+        db.session.commit()
+
+        def use_worker_role(connection):
+            connection.exec_driver_sql('SET LOCAL ROLE ramosolo_mail_worker')
+
+        event.listen(engine, 'begin', use_worker_role)
+        try:
+            provider = FakeMailProvider()
+            run = deliver_with_run(provider)
+            assert run.state == 'completed' and 'synthetic-runtime-mail' in provider.messages
+            assert any(message.subject == 'Appointment confirmed' for message in provider.messages.values())
+            assert db.session.execute(text('SELECT id FROM patients WHERE id=1 FOR UPDATE')).scalar_one() == 1
+            assert db.session.execute(text('SELECT id FROM appointments WHERE id=:id FOR UPDATE'),
+                                      {'id': first_appointment_id}).scalar_one() == first_appointment_id
+            for statement in ('SELECT password_hash FROM users', 'SELECT id FROM clinical_records',
+                              'SELECT id FROM medical_invoices', 'UPDATE patients SET id=id WHERE id=1',
+                              'UPDATE appointments SET id=id WHERE id=:id'):
+                with pytest.raises(ProgrammingError) as denied:
+                    db.session.execute(text(statement), {'id': first_appointment_id})
+                assert getattr(denied.value.orig, 'sqlstate', None) == '42501'
+                db.session.rollback()
+        finally:
+            db.session.remove()
+            event.remove(engine, 'begin', use_worker_role)
     with app.app_context():
         db.session.remove()
         db.engine.dispose()
+
+
+def test_scope_draft_rejects_mismatched_history_without_rewriting_rows(isolated_database):
+    with psycopg.connect(isolated_database, autocommit=True) as connection:
+        connection.execute((ROOT / 'tests/fixtures/ramosolo_live_fixture.sql').read_text(encoding='utf-8'))
+        connection.execute('SET ROLE postgres')
+        for version in range(10, 17):
+            connection.execute(migration(version))
+        connection.execute('ALTER TABLE ramosolo.appointments DISABLE TRIGGER USER')
+        row = connection.execute('''INSERT INTO ramosolo.appointments
+            (patient_id, doctor_id, institution_id, starts_at, ends_at, occupied_until, status, service,
+             care_type, visit_kind, schedule_version)
+            VALUES (1, 1, 2, '2032-11-04 08:00', '2032-11-04 08:30', '2032-11-04 08:35',
+                    'cancelled', 'Synthetic historical mismatch', 'outpatient', 'routine', 1)
+            RETURNING id''').fetchone()[0]
+        connection.execute('ALTER TABLE ramosolo.appointments ENABLE TRIGGER USER')
+        before = existing_projection(connection)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation) as mismatch:
+            connection.execute(migration(17))
+        assert mismatch.value.diag.constraint_name == 'appointment_patient_institution_fkey'
+        connection.execute('ROLLBACK')
+        assert existing_projection(connection) == before
+        assert connection.execute("SELECT to_regclass('ramosolo.email_delivery_runs')").fetchone() == (None,)
+        assert connection.execute('SELECT institution_id FROM ramosolo.appointments WHERE id=%s',
+                                  (row,)).fetchone() == (2,)
 
 
 def db_identity(app, identity):
@@ -705,7 +789,10 @@ def test_account_security_drafts_are_additive_and_private(isolated_database):
             columns = {row[0] for row in connection.execute(
                 "SELECT column_name FROM information_schema.columns WHERE table_schema = 'ramosolo' "
                 "AND table_name = %s", (name,)).fetchall()}
-            assert columns == set(db.metadata.tables[name].columns.keys())
+            expected = set(db.metadata.tables[name].columns.keys())
+            if name == 'security_emails':
+                expected -= {'last_run_id', 'result_code'}
+            assert columns == expected
 
 
 def test_delivery_drafts_preserve_existing_jobs_and_keep_private_tables(isolated_database):
@@ -752,7 +839,7 @@ def test_new_database_migrations_match_orm_and_preserve_synthetic_existing_rows(
     try:
         actual=inspect(engine)
         for table in db.metadata.sorted_tables:
-            if table.name in AUTH_TABLES | DELIVERY_TABLES:
+            if table.name in AUTH_TABLES | DELIVERY_TABLES | PIPELINE_TABLES:
                 continue  # Historical baseline before the independent auth drafts.
             columns={c['name']:c for c in actual.get_columns(table.name)}
             assert set(columns)==set(table.columns.keys()),table.name

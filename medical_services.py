@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from sqlalchemy import select, func
 from extensions import db
-from models import Appointment, Admission
+from models import Appointment, Admission, Patient
 
 TZ = ZoneInfo('Africa/Johannesburg')
 SERVICES = ['Individual therapy', 'Children and family support', 'Couples therapy',
@@ -20,8 +20,10 @@ def parse_local(value):
 def statistics(patients, now=None, include_admissions=True):
     now = now or utcnow()
     ids = [p.id for p in patients]
-    latest = dict(db.session.execute(select(Appointment.patient_id, func.max(Appointment.starts_at)).where(
+    latest = dict(db.session.execute(select(Appointment.patient_id, func.max(Appointment.starts_at))
+        .join(Patient, Patient.id == Appointment.patient_id).where(
         Appointment.patient_id.in_(ids), Appointment.status == 'completed',
+        (Appointment.institution_id == Patient.institution_id) | Appointment.institution_id.is_(None),
         Appointment.starts_at <= now).group_by(Appointment.patient_id)).all())
     cutoff = now - timedelta(days=90)
     active = sum(seen >= cutoff for seen in latest.values())

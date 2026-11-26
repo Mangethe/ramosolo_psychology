@@ -20,7 +20,7 @@ import portal_sessions
 import security_email
 from extensions import db
 from mail_delivery import DeliveryFailure, GMAIL_FROM, GMAIL_SCOPE, SEND_URL, TOKEN_URL, GmailProvider
-from models import (Appointment, AppointmentEmail, Authenticator, CommunicationDecision, PhoneChallenge,
+from models import (Appointment, AppointmentEmail, Authenticator, CommunicationDecision, EmailDeliveryRun, PhoneChallenge,
                     SecurityEmail, VerifiedPhone)
 from sms_delivery import FakeSMSProvider, ProviderUnavailable, TwilioVerifyProvider
 from test_account_security import copy_cookie, password_login
@@ -32,6 +32,30 @@ def response(status, payload, headers=None):
     result = MagicMock(status_code=status, headers=headers or {})
     result.json.return_value = payload
     return result
+
+
+def test_worker_recovers_committed_claim_without_duplicate_send(env, monkeypatch):
+    now = 1_800_000_000
+    monkeypatch.setattr(security_email, 'clock', lambda: now)
+    previous = EmailDeliveryRun(id='previous-synthetic-run', mode='fake', state='running',
+        started_at=now - 300, lease_until=now, counts={'claimed': 1})
+    db.session.add(previous)
+    security_email.enqueue(env[1]['patient'], 'change', 'synthetic-abandoned', detail='Synthetic change')
+    security_email.enqueue(env[1]['patient'], 'change', 'synthetic-new', detail='Synthetic change')
+    db.session.flush()
+    abandoned = db.session.get(SecurityEmail, 'synthetic-abandoned')
+    abandoned.state, abandoned.last_run_id, abandoned.attempts = 'sending', previous.id, 1
+    db.session.commit()
+
+    provider = security_email.FakeMailProvider()
+    report = security_email.deliver_with_run(provider)
+    assert report.state == 'completed' and report.finished_at == now
+    assert report.counts == {'claimed': 1, 'simulated': 1}
+    assert list(provider.messages) == ['synthetic-new']
+    assert abandoned.state == 'uncertain' and abandoned.result_code == 'worker_lease_expired'
+    assert previous.state == 'interrupted' and previous.finished_at == now
+    delivered = db.session.get(SecurityEmail, 'synthetic-new')
+    assert (delivered.last_run_id, delivered.result_code) == (report.id, 'fake_processed')
 
 
 def test_gmail_oauth_only_sends_from_confirmed_mailbox_to_one_recipient(env):

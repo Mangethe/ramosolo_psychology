@@ -239,7 +239,9 @@ def continuity_chart():
 
 def csv_cell(value):
     value = '' if value is None else str(value)
-    return "'" + value if value.lstrip().startswith(('=', '+', '-', '@', '\t', '\r', '\n')) else value
+    normalized = value.lstrip().lstrip('\ufeff').lstrip()
+    risky = value.startswith(('\t', '\r', '\n')) or normalized.startswith(('=', '+', '-', '@', '＝', '＋', '－', '＠'))
+    return "'" + value if risky else value
 
 
 @bp.route('/med/exports', methods=['GET', 'POST'])

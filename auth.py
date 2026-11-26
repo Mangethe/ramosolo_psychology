@@ -39,7 +39,7 @@ def begin_login(user):
         return redirect(url_for('auth.resend_verification'))
     factor = db.session.get(Authenticator, user.id)
     if factor or multi_factor.requires_mfa(user.id):
-        token = multi_factor.start(user, 'challenge' if factor else 'enroll')
+        token = multi_factor.start(user, 'challenge' if factor else 'enrol')
         if not token:
             db.session.rollback()
             flash('Authenticator sign-in is unavailable. Contact the practice.', 'error')
@@ -222,7 +222,9 @@ def security_settings():
                                required=multi_factor.staff_requires_mfa(user.id), recent_recovery=recent_recovery,
                                phone_enabled=enabled(g.membership))
     action = request.form.get('action')
-    if action not in ('enroll', 'replace', 'disable', 'email', 'password'):
+    if action == 'enroll':
+        action = 'enrol'  # Preserve existing clients and forms during the wording change.
+    if action not in ('enrol', 'replace', 'disable', 'email', 'password'):
         abort(400)
     user = db.session.get(User, user.id, with_for_update=True, populate_existing=True)
     if not user or user.get_id() != session.get('_user_id') or not user.enabled:
@@ -232,8 +234,8 @@ def security_settings():
                           recent_recovery=action == 'replace' and recent_recovery):
         flash('We could not confirm your authentication. Try again later.', 'error')
         return redirect(url_for('auth.security_settings'))
-    if action in ('enroll', 'replace'):
-        if (action == 'enroll') == (factor is not None):
+    if action in ('enrol', 'replace'):
+        if (action == 'enrol') == (factor is not None):
             abort(400)
         token = multi_factor.start(user, action)
         if not token:

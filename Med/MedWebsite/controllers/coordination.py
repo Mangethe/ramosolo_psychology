@@ -8,7 +8,7 @@ from flask_login import current_user
 from sqlalchemy import select, func, update
 from sqlalchemy.exc import IntegrityError
 from extensions import db
-from access import (require_roles, require_capability, accessible_patient, patient_scope,
+from access import (require_roles, require_capability, accessible_patient, patient_scope, appointment_institution,
                     can_patient, audit, audit_views)
 from models import (Patient, Admission, CarePlan, DischargeFollowup, Referral, ReferralClinical,
     CommunicationDecision, CareReview, CareReviewSignoff, CoordinationHistory, CoordinationPolicy,
@@ -235,7 +235,8 @@ def referral_detail(referral_id):
                 identity=request.form.get('appointment_id',type=int)
                 if identity:
                     appointment=db.session.scalar(select(Appointment).where(Appointment.id==identity,
-                        Appointment.patient_id==patient.id,Appointment.status=='scheduled'))
+                        Appointment.patient_id==patient.id,appointment_institution(patient.institution_id),
+                        Appointment.status=='scheduled'))
                     if not appointment:abort(400)
                     row.appointment_id=appointment.id;row.appointment_at=appointment.starts_at
                 else:row.appointment_at=date('appointment_at',True)
@@ -250,7 +251,8 @@ def referral_detail(referral_id):
             if g.membership.role=='nurse' or row.status!='appointment_arranged':abort(403)
             appointment=db.session.scalar(select(Appointment).where(
                 Appointment.id==request.form.get('appointment_id',type=int),
-                Appointment.patient_id==patient.id,Appointment.status=='scheduled'))
+                Appointment.patient_id==patient.id,appointment_institution(patient.institution_id),
+                Appointment.status=='scheduled'))
             if not appointment:abort(400)
             prior=row.appointment_id;row.appointment_id=appointment.id;row.appointment_at=appointment.starts_at
             record_history('referral',row,'appointment_rearranged',outcome=f'{prior or 0}->{appointment.id}')

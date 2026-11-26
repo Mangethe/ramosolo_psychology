@@ -41,6 +41,22 @@ class AccountRecovery(db.Model):
     started_at = db.Column(db.BigInteger, nullable=False)
 
 
+class EmailDeliveryRun(db.Model):
+    __tablename__ = 'email_delivery_runs'
+    __table_args__ = (
+        db.CheckConstraint("mode IN ('fake','live')"),
+        db.CheckConstraint("state IN ('running','completed','failed','interrupted')"),
+        db.Index('ix_email_delivery_runs_recovery', 'state', 'lease_until'),
+    )
+    id = db.Column(db.String(32), primary_key=True)
+    mode = db.Column(db.String(12), nullable=False)
+    state = db.Column(db.String(16), nullable=False)
+    started_at = db.Column(db.BigInteger, nullable=False)
+    lease_until = db.Column(db.BigInteger, nullable=False)
+    finished_at = db.Column(db.BigInteger)
+    counts = db.Column(db.JSON, nullable=False)
+
+
 class SecurityEmail(db.Model):
     __tablename__ = 'security_emails'
     __table_args__ = (db.Index('ix_security_emails_due', 'state', 'next_attempt_at'),)
@@ -53,6 +69,8 @@ class SecurityEmail(db.Model):
     next_attempt_at = db.Column(db.BigInteger, nullable=False)
     attempts = db.Column(db.Integer, nullable=False, default=0)
     state = db.Column(db.String(16), nullable=False, default='pending')
+    last_run_id = db.Column(db.String(32), db.ForeignKey('email_delivery_runs.id'), index=True)
+    result_code = db.Column(db.String(40))
 
 
 class AppointmentEmail(db.Model):

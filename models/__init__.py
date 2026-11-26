@@ -1,5 +1,5 @@
 from .models_core import User, Institution
-from .models_auth import (AccountRecovery, AccountVerification, AppointmentEmail, Authenticator, DeliveryLimit,
+from .models_auth import (AccountRecovery, AccountVerification, AppointmentEmail, Authenticator, DeliveryLimit, EmailDeliveryRun,
                           FederatedIdentity, OIDCExchange,
                           PendingAuthentication, PhoneChallenge, PortalSession, RecoveryCode, SecurityEmail,
                           VerifiedPhone)

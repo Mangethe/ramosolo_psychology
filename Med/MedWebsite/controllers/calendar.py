@@ -14,12 +14,14 @@ from . import bp
 
 
 def scoped_appointment(identity):
+    from access import appointment_institution
     patient= db.session.scalar(patient_scope().where(Patient.id.in_(
         select(Appointment.patient_id).where(Appointment.id==identity))))
     if not patient:abort(404)
     lock_doctor(patient.doctor_id,patient.institution_id)
     row=db.session.scalar(select(Appointment).where(Appointment.id==identity,
-        Appointment.patient_id==patient.id,Appointment.doctor_id==patient.doctor_id).with_for_update().execution_options(populate_existing=True))
+        Appointment.patient_id==patient.id,Appointment.doctor_id==patient.doctor_id,
+        appointment_institution(patient.institution_id)).with_for_update().execution_options(populate_existing=True))
     if not row:abort(404)
     return patient,row
 
@@ -27,9 +29,11 @@ def scoped_appointment(identity):
 @bp.get('/med/calendar')
 @require_roles('dr','dr_assist','admin')
 def calendar():
+    from access import appointment_institution
     patients=list(db.session.scalars(patient_scope().order_by(Patient.name)))
     rows=list(db.session.scalars(select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]),
-        Appointment.doctor_id.in_({p.doctor_id for p in patients})).order_by(Appointment.starts_at)))
+        Appointment.doctor_id.in_({p.doctor_id for p in patients}),
+        appointment_institution(g.membership.institution_id)).order_by(Appointment.starts_at)))
     proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,
         AppointmentProposal.appointment_id.in_([a.id for a in rows])).order_by(AppointmentProposal.created_at.desc())))
     doctor_ids={p.doctor_id for p in patients}
@@ -45,13 +49,15 @@ def calendar():
 @bp.get('/med/calendar/availability')
 @require_roles('dr','dr_assist','admin')
 def calendar_availability():
+    from access import appointment_institution
     patient=accessible_patient(request.args.get('patient_id',type=int))
     try:
         day=date.fromisoformat(request.args.get('day',''))
         care=request.args.get('care_type','outpatient');kind=request.args.get('visit_kind','followup')
         exclude=request.args.get('appointment_id',type=int)
         if exclude:
-            row=db.session.scalar(select(Appointment).where(Appointment.id==exclude,Appointment.patient_id==patient.id))
+            row=db.session.scalar(select(Appointment).where(Appointment.id==exclude,Appointment.patient_id==patient.id,
+                appointment_institution(patient.institution_id)))
             if not row:abort(404)
             care=row.care_type or 'outpatient';kind=row.visit_kind or 'followup'
         slots=available_slots(patient,day,care,kind,exclude)
@@ -121,8 +127,11 @@ def guest_proposal(token):
     # No appointment times or personal information before independent code verification.
     if request.method=='GET':return render_template('medical/guest_proposal.html')
     appointment=db.session.get(Appointment,proposal.appointment_id)
+    if not appointment:abort(404)
     patient=db.session.get(Patient,appointment.patient_id)
-    if patient.user_id or patient.institution_id!=proposal.institution_id or appointment.doctor_id!=patient.doctor_id:abort(404)
+    if (not patient or patient.user_id or patient.institution_id!=proposal.institution_id or
+            appointment.institution_id not in (None, patient.institution_id) or
+            appointment.doctor_id!=patient.doctor_id):abort(404)
     lock_doctor(appointment.doctor_id,proposal.institution_id)
     db.session.refresh(appointment);db.session.refresh(proposal)
     if proposal.expires_at<=utcnow() or proposal.state!='pending':abort(410)

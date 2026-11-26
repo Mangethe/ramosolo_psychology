@@ -1,4 +1,97 @@
-{% extends 'portal.html' %}{% from 'partials/tables.html' import appointment_table %}{% block content %}<div class="page-heading"><div><p class="eyebrow">{{ 'YOUR CARE, CONNECTED' if membership.role=='patient' else now|localtime('%A, %d %B %Y') }}</p><h1>{{ title }}.</h1><p class="muted">{{ 'Your appointments and reminders, in one place.' if membership.role=='patient' else 'A clear view of your patients, appointments and next steps.' }}</p></div><a class="button" href="{{ url_for('med.appointments') }}">{{ 'My appointments' if membership.role=='patient' else 'Manage appointments' }} ↗</a></div>
-{% if membership.role=='patient' %}<div class="patient-welcome panel"><span class="pill">YOUR NEXT APPOINTMENT</span>{% if appointments %}<h2>{{ appointments[0].starts_at|localtime('%A, %d %B') }}</h2><p>{{ appointments[0].starts_at|localtime('%H:%M') }} · {{ appointments[0].service }}</p><p class="muted">With {{ appointments[0].patient.doctor.name }}</p>{% else %}<h2>Nothing scheduled yet.</h2><p>Contact the practice to arrange your next appointment.</p>{% endif %}</div>{% else %}<section class="metric-grid" aria-label="Patient statistics">{% for value,label,caption in [(stats.active,'Active patients','Seen within the last 90 days'),(stats.inactive,'Inactive patients','Last seen more than 90 days ago'),(stats.admitted,'Currently admitted','Patients with an open admission'),(stats.never_seen,'Not yet seen','No completed appointment')] %}{% if membership.role!='dr_assist' or label!='Currently admitted' %}<article class="metric {% if loop.first %}metric-featured{% endif %}"><div class="metric-label">{{ label }}<span aria-hidden="true">↗</span></div><strong>{{ value }}</strong><p>{{ caption }}</p></article>{% endif %}{% endfor %}</section>{% endif %}
-<div class="dashboard-grid"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">WHAT'S COMING UP</p><h2>{{ 'Your upcoming appointments' if membership.role=='patient' else 'Upcoming appointments' }}</h2></div><a class="text-link" href="{{ url_for('med.appointments') }}">View all ↗</a></div>{{ appointment_table(appointments, membership.role) }}</section><aside class="panel reminder-panel"><p class="eyebrow">THE NEXT SEVEN DAYS</p><h2>Reminders <span class="count">{{ reminders|length }}</span></h2>{% for a in reminders %}<div class="reminder"><span class="reminder-dot"></span><div><strong>{{ a.starts_at|localtime('%d %b · %H:%M') }}</strong><p>{{ a.service }}</p>{% if membership.role!='patient' %}<small>{{ a.patient.name }}</small>{% endif %}</div></div>{% else %}<div class="empty compact">You're up to date.<br>No appointments in the next seven days.</div>{% endfor %}<p class="fine">In-app reminders only. No SMS or email is sent.</p></aside></div>
-{% if membership.role!='patient' %}<div class="info-strip"><span class="info-icon">i</span><p><strong>{{ stats.total }} patients in your workspace.</strong> Counts use each patient's latest completed appointment. Future, cancelled and missed visits do not count as being seen.</p></div>{% endif %}{% endblock %}
+{% extends 'portal.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set is_patient = membership.role == 'patient' %}
+<div class="practice-board">
+  <header class="board-hero">
+    <div>
+      <p class="eyebrow">{{ now|localtime('%A, %d %B %Y') }}</p>
+      <h1>{{ title }}</h1>
+      <p>{{ 'Your care schedule' if is_patient else membership.institution.name }}</p>
+    </div>
+    <a class="button" href="{{ url_for('med.appointments') }}">{{ 'My appointments' if is_patient else 'Manage appointments' }}</a>
+  </header>
+
+  <div class="board-layout">
+    <section class="panel board-schedule" id="schedule" aria-labelledby="schedule-title">
+      <div class="board-heading">
+        <div>
+          <h2 id="schedule-title">{{ 'Your upcoming appointments' if is_patient else 'Upcoming schedule' }}</h2>
+          <p class="muted">{{ chart_total }} scheduled · South Africa time</p>
+        </div>
+        <nav class="board-periods" aria-label="Schedule period">
+          {% for value, label in periods %}
+          <a href="{{ url_for('med.dashboard', period=value, _anchor='schedule') }}"{% if value == period %} aria-current="page"{% endif %}>{{ label }}</a>
+          {% endfor %}
+        </nav>
+      </div>
+
+      {% if period > 1 %}
+      <nav class="board-chart" aria-label="Filter by appointment day">
+        {% for day, count in chart %}
+        <a class="board-day" href="{{ url_for('med.dashboard', period=period, day=day.isoformat(), _anchor='agenda') }}"
+           aria-label="{{ day.strftime('%A %d %B') }}, {{ count }} scheduled"{% if selected_day == day %} aria-current="date"{% endif %}>
+          <strong>{{ count }}</strong>
+          <span class="board-bar" aria-hidden="true"><meter tabindex="-1" min="0" max="{{ chart_max }}" value="{{ count }}"></meter></span>
+          <span>{{ day.strftime('%a') }}</span>
+          <time datetime="{{ day.isoformat() }}">{{ day.day }}</time>
+        </a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+
+      <section class="board-agenda" id="agenda" aria-labelledby="agenda-title">
+        <div class="board-heading">
+          <div>
+            <h3 id="agenda-title">{{ selected_day.strftime('%A, %d %B') if selected_day else 'Agenda' }}</h3>
+            {% if list_total > appointments|length %}<p class="muted">Showing the first {{ appointments|length }} of {{ list_total }}</p>{% endif %}
+          </div>
+          {% if selected_day %}<a class="text-link" href="{{ url_for('med.dashboard', period=period, _anchor='agenda') }}">Show all days</a>{% endif %}
+        </div>
+        {% if appointments %}
+        <ul class="board-appointments">
+          {% for appointment in appointments %}
+          <li>
+            <div class="board-slot"><strong>{{ appointment.starts_at|localtime('%H:%M') }}</strong><span>{{ appointment.starts_at|localtime('%a, %d %b') }}</span></div>
+            <div><strong>{{ appointment.service }}</strong>{% if not is_patient %}<a class="text-link board-patient" href="{{ url_for('med.patient_detail', patient_id=appointment.patient_id) }}">{{ appointment.patient.name }}</a>{% endif %}</div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty compact">No upcoming appointments {{ 'on this day' if selected_day or period == 1 else 'in this period' }}.</p>
+        {% endif %}
+      </section>
+    </section>
+
+    {% if is_patient %}
+    <aside class="panel board-overview" aria-labelledby="next-appointment">
+      <h2 id="next-appointment">YOUR NEXT APPOINTMENT</h2>
+      {% if next_appointment %}
+      <p class="board-next-date">{{ next_appointment.starts_at|localtime('%A, %d %B') }}</p>
+      <p>{{ next_appointment.starts_at|localtime('%H:%M') }} · {{ next_appointment.service }}</p>
+      <p class="muted">With {{ next_appointment.patient.doctor.name }}</p>
+      {% else %}
+      <p class="board-next-date">Nothing scheduled yet</p>
+      <p class="muted">Contact the practice to arrange your next appointment.</p>
+      {% endif %}
+    </aside>
+    {% else %}
+    <aside class="panel board-overview" aria-labelledby="patient-overview">
+      <h2 id="patient-overview">Patient overview</h2>
+      <p class="muted">{{ stats.total }} {{ 'patient' if stats.total == 1 else 'patients' }} in your workspace</p>
+      <div class="board-metrics">
+        {% for value, label, caption in [(stats.active,'Active patients','Seen in the last 90 days'),(stats.inactive,'Inactive patients','Last seen over 90 days ago'),(stats.admitted,'Currently admitted','Patients with an open admission'),(stats.never_seen,'Not yet seen','No completed appointment')] %}
+        {% if membership.role != 'dr_assist' or label != 'Currently admitted' %}
+        <article class="board-metric{% if loop.first %} board-metric-primary{% endif %}">
+          <div class="metric-label">{{ label }}<span aria-hidden="true"></span></div><strong>{{ value }}</strong>
+          <p>{{ caption }}</p>
+        </article>
+        {% endif %}
+        {% endfor %}
+      </div>
+      <a class="text-link board-patients-link" href="{{ url_for('med.patients') }}">View patients</a>
+    </aside>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
