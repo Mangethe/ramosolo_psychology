@@ -9,8 +9,9 @@ from datetime import timedelta
 import json
 from werkzeug.serving import make_server,WSGIRequestHandler
 from app import create_app
+from booking_terms import booking_terms
 from extensions import db
-from models import User,Institution,Membership,Patient,CareAssignment,Appointment,ClinicalRecord
+from models import AccountVerification,User,Institution,Membership,Patient,CareAssignment,Appointment,ClinicalRecord
 from medical_services import utcnow
 
 
@@ -20,14 +21,22 @@ class QuietHandler(WSGIRequestHandler):
 
 app=create_app({'TESTING':True,'SQLALCHEMY_DATABASE_URI':'sqlite://',
     'SQLALCHEMY_ENGINE_OPTIONS':{},'SECRET_KEY':'synthetic-shell-preview-only',
+    'AUTH_REQUIRE_STAFF_MFA':False,'AUTH_SSO_ENABLED':False,
     'PRIVATE_CANARY':'SYNTHETIC_BROWSER_SECRET_8a73'})
 with app.app_context():
     db.create_all()
     institution=Institution(name='Synthetic preview practice',kind='medical')
     db.session.add(institution);db.session.flush();users={}
+    app.config['PUBLIC_INSTITUTION_ID'] = institution.id
+    app.config['BOOKING_TERMS'] = booking_terms(json.dumps({
+        'Individual therapy': {'currency': 'ZAR', 'fee': '123.00', 'deposit': '0.00',
+            'cancellation': 'Synthetic cancellation terms', 'no_show': 'Synthetic missed-appointment terms',
+            'refund': 'Synthetic refund terms'}
+    }), institution.id)
     for role in ('dr','dr_assist','nurse','admin','patient'):
         user=User(name='Preview '+role,email=role+'@example.test')
         user.set_password('Synthetic-preview-123!');db.session.add(user);db.session.flush();users[role]=user
+        db.session.add(AccountVerification(user_id=user.id,verified_email=user.email,verified_at=1))
         db.session.add(Membership(institution_id=institution.id,user_id=user.id,role=role,
             supervising_doctor_id=users['dr'].id if role=='dr_assist' else None))
     p=Patient(institution_id=institution.id,doctor_id=users['dr'].id,

@@ -255,6 +255,8 @@ def test_constraint_fingerprint_is_order_stable_and_rejects_definition_drift(iso
         assert actual == fixture_fingerprint == fixture_profile['constraint_fingerprint']
         assert fixture_fingerprint != expected
 
+        preflight = (ROOT/'supabase/review/reconciliation_constraints_preflight.sql').read_text(encoding='utf-8')
+        connection.execute(preflight)
         connection.execute('''
             ALTER TABLE ramosolo.appointments DROP CONSTRAINT appointments_status_check;
             ALTER TABLE ramosolo.appointments
@@ -262,8 +264,13 @@ def test_constraint_fingerprint_is_order_stable_and_rejects_definition_drift(iso
         ''')
         connection.execute('SET ROLE postgres')
         with pytest.raises(RaiseException, match='Existing constraint definition drift'):
-            connection.execute(draft)
+            connection.execute(preflight)
         connection.rollback()
+        # The immutable migration checks the definition fingerprint itself on PostgreSQL 17.
+        if connection.info.server_version // 10000 == 17:
+            with pytest.raises(RaiseException, match='Existing constraint definition drift'):
+                connection.execute(draft)
+            connection.rollback()
         connection.execute('RESET ROLE')
         assert connection.execute(
             'SELECT version FROM ramosolo.schema_versions ORDER BY version'
@@ -439,6 +446,59 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
             ORDER BY conname""").fetchall() == [('appointment_patient_institution_fkey', True),
                                                 ('appointment_request_institution_fkey', True)]
         connection.execute((ROOT/'verification'/'runtime_roles.sql').read_text(encoding='utf-8'))
+        followup_permissions = (ROOT/'supabase/review/runtime_permissions_followup.sql').read_text(encoding='utf-8')
+        connection.execute('GRANT postgres TO ramosolo_app_runtime')
+        with pytest.raises(psycopg.errors.RaiseException, match='A Ramosolo service role'):
+            connection.execute(followup_permissions)
+        connection.rollback()
+        connection.execute('REVOKE postgres FROM ramosolo_app_runtime')
+        connection.execute('GRANT SELECT (id) ON ramosolo.patients TO anon')
+        with pytest.raises(psycopg.errors.RaiseException, match='Data API role has Ramosolo privileges'):
+            connection.execute(followup_permissions)
+        connection.rollback()
+        connection.execute('REVOKE SELECT (id) ON ramosolo.patients FROM anon')
+        connection.execute(followup_permissions)
+        existing_tables, rows_before_authority = existing_projection(connection)
+        grants_before_authority = existing_table_grants(connection)
+        ledger_query = 'SELECT version FROM ramosolo.schema_versions ORDER BY version'
+        ledger_before_authority = connection.execute(ledger_query).fetchall()
+        connection.execute((ROOT/'supabase/review/representative_authority_draft.sql').read_text(encoding='utf-8'))
+        assert existing_projection(connection, existing_tables)[1] == rows_before_authority
+        grants_after_authority = existing_table_grants(connection)
+        assert {table: grants_after_authority[table] for table in grants_before_authority} == grants_before_authority
+        assert connection.execute(ledger_query).fetchall() == ledger_before_authority
+        assert connection.execute('SELECT count(*) FROM ramosolo.representative_authority_decisions').fetchone() == (0,)
+        authority_insert = """INSERT INTO ramosolo.representative_authority_decisions
+            (institution_id, patient_id, representative_account_id, recorded_by_account_id,
+             purpose, outcome, policy_version, evidence_reference, valid_until)
+            VALUES (1, %s, 4, 1, %s, 'granted', 'synthetic-policy-v1', %s, now() + interval '1 day')"""
+        evidence = uuid.uuid4()
+        connection.execute(authority_insert, (2, 'appointment_logistics', evidence))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            connection.execute(authority_insert, (3, 'appointment_logistics', evidence))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            connection.execute(authority_insert, (2, 'clinical_records', evidence))
+        for role in ('anon', 'authenticated', 'ramosolo_app_runtime', 'ramosolo_mail_worker'):
+            connection.execute(sql.SQL('SET ROLE {}').format(sql.Identifier(role)))
+            try:
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    connection.execute('SELECT id FROM ramosolo.representative_authority_decisions')
+            finally:
+                connection.execute('RESET ROLE')
+        for statement in (ROOT/'supabase/review/security_runtime_readonly.sql').read_text(encoding='utf-8').split(';'):
+            if statement.strip():
+                connection.execute(statement)
+        assert connection.execute("""SELECT
+            has_table_privilege('ramosolo_app_runtime', 'ramosolo.attendance_followup_reviews', 'INSERT'),
+            has_sequence_privilege('ramosolo_app_runtime', 'ramosolo.attendance_followup_reviews_id_seq', 'USAGE'),
+            has_table_privilege('ramosolo_app_runtime', 'ramosolo.audit_events', 'UPDATE,DELETE,TRUNCATE'),
+            has_table_privilege('ramosolo_app_runtime', 'ramosolo.account_recoveries', 'SELECT'),
+            has_table_privilege('ramosolo_app_runtime', 'ramosolo.availability_policies', 'INSERT,UPDATE'),
+            has_table_privilege('ramosolo_app_runtime', 'ramosolo.federated_identities', 'UPDATE'),
+            has_column_privilege('ramosolo_app_runtime', 'ramosolo.security_emails', 'state', 'UPDATE'),
+            has_column_privilege('ramosolo_app_runtime', 'ramosolo.security_emails', 'recipient', 'UPDATE'),
+            has_schema_privilege('ramosolo_app_runtime', 'ramosolo', 'CREATE')""").fetchone() == (
+                True, True, False, False, False, False, True, False, False)
 
     app = create_app({'TESTING': True, 'SECRET_KEY': 'synthetic-reconciliation-app',
         'SQLALCHEMY_DATABASE_URI': isolated_database.replace('postgresql://','postgresql+psycopg://',1),
@@ -504,6 +564,10 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
         connection.exec_driver_sql('SET LOCAL ROLE ramosolo_app_runtime')
 
     event.listen(engine, 'begin', use_portal_role)
+    representative = client_for((app, {}, {'representative': '4:1'}), 'representative')
+    assert representative.get('/med/appointments').status_code == 200
+    assert representative.get('/med/patients/2').status_code == 403
+    assert representative.get('/med/patients/2/records/diagnoses').status_code == 403
     client = app.test_client()
     response = client.post('/auth/login', data={
         'email': 'fixture-doctor-a@example.test', 'password': synthetic_password})
@@ -520,6 +584,12 @@ def test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries(isol
     assert client.get('/med').status_code == 200
     assert client.get('/med/appointments').status_code == 200
     assert client.get('/med/calendar').status_code == 200
+    revoked_cookie = client.get_cookie(app.config['SESSION_COOKIE_NAME']).value
+    assert client.post('/auth/logout').status_code == 302
+    client.set_cookie(app.config['SESSION_COOKIE_NAME'], revoked_cookie)
+    assert client.get('/med').status_code == 302
+    assert client.post('/auth/login', data={'email': 'fixture-doctor-a@example.test',
+        'password': synthetic_password}).location.endswith('/med')
 
     first_start = utc_on(day, time(8))
     first_local = local(first_start)

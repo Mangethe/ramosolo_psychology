@@ -5,7 +5,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import Patient, Appointment, Admission, Membership, CareAssignment, User
-from access import (appointment_institution, require_roles, require_capability, patient_scope,
+from access import (appointment_assignment, appointment_institution, require_roles, require_capability, patient_scope,
                     accessible_patient, audit, audit_views, ROLE_MATRIX)
 from medical_services import SERVICES, utcnow, parse_local, statistics, doctors, TZ
 from . import bp
@@ -49,7 +49,7 @@ def dashboard():
 
     scope = patient_scope()
     upcoming = select(Appointment).where(Appointment.patient_id.in_(scope.with_only_columns(Patient.id)),
-        appointment_institution(g.membership.institution_id), Appointment.status == 'scheduled',
+        appointment_institution(g.membership.institution_id), appointment_assignment(), Appointment.status == 'scheduled',
         Appointment.starts_at >= now)
     # SQL returns counts per Johannesburg day without exporting appointment records for the chart.
     bucket = case(*[(Appointment.starts_at < end, index) for index, end in enumerate(boundaries[1:-1])],
@@ -68,7 +68,7 @@ def dashboard():
     is_patient = g.membership.role == 'patient'
     next_appointment = db.session.scalar(upcoming.order_by(Appointment.starts_at, Appointment.id).limit(1)) if is_patient else None
     stats = None if is_patient else statistics(list(db.session.scalars(scope)),
-                                               now=now, include_admissions=g.membership.role != 'dr_assist')[0]
+        now=now, include_admissions=g.membership.role != 'dr_assist', appointment_filter=appointment_assignment())[0]
     viewed = {appointment.id: appointment for appointment in appointments}
     if next_appointment:
         viewed[next_appointment.id] = next_appointment
@@ -87,7 +87,8 @@ def dashboard():
 @require_roles(*STAFF)
 def patients():
     rows = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    stats, latest, admitted = statistics(rows,include_admissions=g.membership.role!='dr_assist')
+    _, latest, admitted = statistics(rows, include_admissions=g.membership.role != 'dr_assist',
+                                     appointment_filter=appointment_assignment())
     q = request.args.get('q', '').strip().lower()[:100]
     if q:
         rows = [p for p in rows if q in p.name.lower() or q in (p.email or '').lower()]
@@ -128,7 +129,7 @@ def create_patient():
 def patient_detail(patient_id):
     patient = accessible_patient(patient_id)
     appointments = list(db.session.scalars(select(Appointment).where(
-        Appointment.patient_id == patient.id, appointment_institution(patient.institution_id))
+        Appointment.patient_id == patient.id, appointment_institution(patient.institution_id), appointment_assignment())
         .order_by(Appointment.starts_at.desc())))
 
     admissions = [] if g.membership.role == 'dr_assist' else list(db.session.scalars(select(Admission).where(
@@ -166,16 +167,17 @@ def assign_nurse(patient_id):
 @bp.get('/med/appointments')
 @require_roles(*ALL)
 def appointments():
-    patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    query = select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]),
-        appointment_institution(g.membership.institution_id))
-    if g.membership.role=='dr_assist':
-        query=query.where(Appointment.doctor_id==g.membership.supervising_doctor_id)
+    query = select(Appointment).where(Appointment.patient_id.in_(patient_scope().with_only_columns(Patient.id)),
+        appointment_institution(g.membership.institution_id), appointment_assignment())
     rows = list(db.session.scalars(query.order_by(Appointment.starts_at.desc())))
     audit_views('appointment', rows)
-    from models import AppointmentProposal
-    proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,AppointmentProposal.appointment_id.in_([a.id for a in rows]))))
-    return render_template('medical/appointments.html', appointments=rows, patients=patients, services=SERVICES,proposals=proposals)
+    proposals = []
+    if g.membership.role == 'patient':
+        from models import AppointmentProposal
+        proposals = db.session.execute(select(AppointmentProposal.id, AppointmentProposal.proposed_at,
+            AppointmentProposal.state).where(AppointmentProposal.institution_id == g.membership.institution_id,
+            AppointmentProposal.appointment_id.in_([a.id for a in rows]))).all()
+    return render_template('medical/appointments.html', appointments=rows, proposals=proposals)
 @bp.post('/med/appointments')
 @require_roles(*SCHEDULERS)
 def create_appointment():
@@ -205,15 +207,12 @@ def create_appointment():
     except (ValueError,TypeError,IntegrityError) as error:
         db.session.rollback()
         flash(str(error) if isinstance(error,ValueError) else 'This slot is unavailable.','error')
-        flash(str(error) if isinstance(error,ValueError) else 'This slot is unavailable.','error')
     return redirect(url_for('med.appointments'))
 
 
 @bp.post('/med/appointments/<int:appointment_id>/status')
 @require_roles(*SCHEDULERS)
 def appointment_status(appointment_id):
-    from .calendar import scoped_appointment
-    patient, appointment = scoped_appointment(appointment_id)
     from .calendar import scoped_appointment
     patient, appointment = scoped_appointment(appointment_id)
     status = request.form.get('status')
@@ -228,18 +227,13 @@ def appointment_status(appointment_id):
         if request.form.get('version',type=int)!=appointment.schedule_version:abort(409)
         if status=='scheduled':abort(403)  # use the shared booking engine to create a new booking
     old_status = appointment.status
-    if status in ('scheduled','cancelled') and appointment.status!=status:
-        if request.form.get('version',type=int)!=appointment.schedule_version:abort(409)
-        if status=='scheduled':abort(403)  # use the shared booking engine to create a new booking
-    old_status = appointment.status
     appointment.status = status
     if old_status!=status:
-        from scheduling_services import history,refresh_reminders
+        from scheduling_services import history, pending_proposals, refresh_reminders
         appointment.schedule_version+=1
         history(appointment,'status_'+status,old=appointment.starts_at,reason=request.form.get('reason','')[:240])
         if status=='cancelled':
-            from models import AppointmentProposal
-            for proposal in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,AppointmentProposal.state=='pending')):
+            for proposal in db.session.scalars(pending_proposals(appointment)):
                 proposal.state='superseded';proposal.responded_at=utcnow()
             refresh_reminders(appointment)
     try:
@@ -287,12 +281,10 @@ def reschedule_appointment(appointment_id):
 
 @bp.get('/med/admissions')
 @require_capability('admissions')
-@require_capability('admissions')
 def admissions():
     patients = list(db.session.scalars(patient_scope().order_by(Patient.name)))
     rows = list(db.session.scalars(select(Admission).where(Admission.patient_id.in_(
         [p.id for p in patients])).order_by(Admission.admitted_at.desc())))
-    audit_views('admission', rows)
     audit_views('admission', rows)
     return render_template('medical/admissions.html', admissions=rows, patients=patients)
 
@@ -321,8 +313,8 @@ def admit():
 def discharge(admission_id):
     row = db.session.scalar(select(Admission).where(Admission.id==admission_id,
         Admission.patient_id.in_(patient_scope().with_only_columns(Patient.id))))
-    row = db.session.scalar(select(Admission).where(Admission.id==admission_id,
-        Admission.patient_id.in_(patient_scope().with_only_columns(Patient.id))))
+    if not row:
+        abort(404)
     if not row:
         abort(404)
     patient=accessible_patient(row.patient_id)
@@ -330,17 +322,8 @@ def discharge(admission_id):
     lock_patient(patient.id)
     row=db.session.scalar(select(Admission).where(Admission.id==admission_id,
         Admission.patient_id==patient.id).with_for_update().execution_options(populate_existing=True))
-    patient=accessible_patient(row.patient_id)
-    from coordination_services import lock_patient, ensure_discharge, record_history
-    lock_patient(patient.id)
-    row=db.session.scalar(select(Admission).where(Admission.id==admission_id,
-        Admission.patient_id==patient.id).with_for_update().execution_options(populate_existing=True))
     if row.discharged_at is None:
         row.discharged_at = utcnow()
-        followup=ensure_discharge(row,patient)
-        if followup.due_at and followup.due_at<row.discharged_at:
-            followup.planning_complete=False
-        record_history('discharge_followup',followup,'actual_discharge_recorded')
         followup=ensure_discharge(row,patient)
         if followup.due_at and followup.due_at<row.discharged_at:
             followup.planning_complete=False

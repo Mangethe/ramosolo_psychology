@@ -4,7 +4,7 @@ from flask import abort, g
 from flask_login import current_user
 from sqlalchemy import select, or_, MetaData, Table, inspect, update, func
 from extensions import db
-from access import audit, patient_scope, can_patient, continuity_scope
+from access import appointment_assignment, appointment_institution, audit, patient_scope, can_patient, continuity_scope
 from medical_services import utcnow
 from models import (Patient, Membership, User, CareAssignment, CarePlan, Admission,
     ContinuityEvent, ContinuityNotification, CommunicationDecision, CoordinationPolicy,
@@ -162,7 +162,8 @@ def suppress_unsent(patient,purpose,channel,scope='*',reason='consent_withdrawn'
                     version=preferences.c.version+1,changed_by=current_user.id,changed_at=utcnow()))
         if outbox is not None:
             from models import Appointment
-            appts=select(Appointment.id).where(Appointment.patient_id==patient.id)
+            appts=select(Appointment.id).where(Appointment.patient_id==patient.id,
+                appointment_institution(patient.institution_id))
             ids=list(db.session.scalars(select(outbox.c.id).where(
                 outbox.c.institution_id==patient.institution_id,outbox.c.appointment_id.in_(appts),
                 outbox.c.state.in_(('pending','failed')),outbox.c.sent_at.is_(None)).with_for_update()))
@@ -192,7 +193,8 @@ def recheck_queued(patient):
     selected=[outbox.c.id,outbox.c.appointment_id]
     if 'preference_id' in outbox.c:selected.append(outbox.c.preference_id)
     jobs=db.session.execute(select(*selected).where(outbox.c.institution_id==patient.institution_id,
-        outbox.c.appointment_id.in_(select(Appointment.id).where(Appointment.patient_id==patient.id)),
+        outbox.c.appointment_id.in_(select(Appointment.id).where(Appointment.patient_id==patient.id,
+            appointment_institution(patient.institution_id))),
         outbox.c.state.in_(('pending','failed')),outbox.c.sent_at.is_(None)).with_for_update()).mappings()
     for job in jobs:
         valid=False
@@ -338,9 +340,10 @@ def action_items():
             url_for('med.referral_detail',referral_id=row.id) if role!='patient' else url_for('med.my_agreed_actions'),
             row.status,row.owner_id,row.due_at,row.updated_at,row.escalated,row.owner_unavailable)
         if row.appointment_id and row.status=='appointment_arranged':
-            appointment=db.session.scalar(select(Appointment).where(Appointment.id==row.appointment_id,
-                Appointment.patient_id==row.patient_id))
-            if appointment and appointment.status=='cancelled':
+            appointment_status=db.session.scalar(select(Appointment.status).where(
+                Appointment.id==row.appointment_id, Appointment.patient_id==row.patient_id,
+                appointment_institution(g.membership.institution_id), appointment_assignment()))
+            if appointment_status=='cancelled':
                 items[-1]['reasons'].append('Appointment cancelled')
                 items[-1]['attention']+=' · Appointment cancelled'
     latest={}
@@ -378,7 +381,9 @@ def action_items():
             for field in ('owner_id','cover_id','due_at','escalated'):
                 if field in legacy.c:columns.append(legacy.c[field])
             rows=db.session.execute(select(*columns).join(Appointment,Appointment.id==legacy.c.appointment_id).where(
-                legacy.c.institution_id==g.membership.institution_id,Appointment.patient_id.in_(ids))).mappings()
+                legacy.c.institution_id==g.membership.institution_id,
+                appointment_institution(g.membership.institution_id), appointment_assignment(),
+                Appointment.patient_id.in_(ids))).mappings()
             rules={'confirmation_due':'unconfirmed_booking','delivery_failed':'failed_reminder','attendance_history':'missed_appointment'}
             for row in rows:
                 if role=='nurse' and current_user.id not in (row.get('owner_id'),row.get('cover_id')):continue

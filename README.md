@@ -450,8 +450,9 @@ admissions/discharges would be separate changes. Public enquiries are not emerge
 communications. The activity log is a basic application record, not an immutable
 compliance audit trail, and is not a complete log of every list view.
 
-Run development only on loopback. For a reviewed deployment use a WSGI server such
-as `waitress-serve --call app:create_app`, behind a configured HTTPS reverse proxy.
+Run development only on loopback. For a reviewed deployment use the production
+Waitress factory behind the configured HTTPS proxy. See the
+[security follow-up](docs/ramosolo-security-followup.md) for the proxy command.
 Do not expose the Flask development server or demo database publicly. License and
 content reuse rights remain the owner's decision; no license was invented.
 
@@ -684,11 +685,12 @@ deployment checks. Only reviewed public assets in `security.PUBLIC_ASSETS` are
 served. Existing logins without the new clock fields require sign-in again;
 sessions expire after 30 minutes idle or two hours total.
 
-Production now requires `APP_ENV=production`, explicit `APP_TRUSTED_HOSTS`,
-secure PostgreSQL TLS and a reviewed HTTPS proxy boundary. The production factory
+Production requires `APP_ENV=production`, explicit `APP_TRUSTED_HOSTS`,
+the matching HTTPS `AUTH_PUBLIC_URL`, PostgreSQL `sslmode=verify-full` with the
+provider CA, and a reviewed HTTPS proxy boundary. The production factory
 is `wsgi:create_production_app`; use Waitress on a private/loopback listener.
 `APP_TRUSTED_PROXY_HOPS` defaults to `0`; use `1` only for one controlled TLS edge
-that cannot be bypassed. Keep credentials server-side. No live grants or RLS were
+that supplies both client address and scheme and cannot be bypassed. Keep credentials server-side. No live grants or RLS were
 changed. The [runtime-role check](supabase/review/security_runtime_readonly.sql)
 is SELECT-only and must use the protected deployed application connection.
 

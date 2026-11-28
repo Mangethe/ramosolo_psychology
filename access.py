@@ -1,7 +1,7 @@
 from functools import wraps
 from flask import abort, g, session
 from flask_login import current_user
-from sqlalchemy import select, false
+from sqlalchemy import select, false, true
 from extensions import db
 from models import Appointment, Membership, Patient, CareAssignment, AuditEvent, User, PatientPermission
 
@@ -138,6 +138,16 @@ def appointment_institution(institution_id):
     # SQLite and older local records can omit the redundant appointment scope.
     # The caller still has to check the authoritative patient institution.
     return (Appointment.institution_id == institution_id) | Appointment.institution_id.is_(None)
+
+
+def appointment_assignment():
+    """Doctors and assistants can see only the schedule they are assigned to."""
+    membership = g.membership
+    if membership.role == 'dr':
+        return Appointment.doctor_id == current_user.id
+    if membership.role == 'dr_assist':
+        return Appointment.doctor_id == membership.supervising_doctor_id
+    return true()
 
 
 def audit(action, resource, resource_id):

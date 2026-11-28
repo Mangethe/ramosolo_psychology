@@ -1,27 +1,29 @@
 """Browser-facing boundaries. No credentials or clinical text in diagnostics."""
 from pathlib import Path
 from urllib.parse import urlsplit
-from flask import Flask, abort, g, request, session, send_file
+from flask import Flask, abort, g, request, send_file
+from werkzeug.exceptions import SecurityError
 
 
 # Explicit release inventory, not a suffix allowlist. Add reviewed frontend assets
 # here when needed; source maps, uploads and arbitrary files are never public.
-PUBLIC_ASSETS = {'css/style.css': 'text/css', 'js/session-warning.js': 'text/javascript'}
+PUBLIC_ASSETS = {
+    'css/style.css': 'text/css',
+    'js/session-warning.js': 'text/javascript',
+    'js/general-questions.js': 'text/javascript',
+}
 
 
 class SecureFlask(Flask):
     def send_static_file(self, filename):
         if filename not in PUBLIC_ASSETS or not self.static_folder:
             abort(404)
-        root=Path(self.static_folder).resolve()
-        target=root.joinpath(*filename.split('/'))
-        # Refuse both file and directory symlinks, including links back inside root.
-        if any(part.is_symlink() for part in (target,*target.parents) if part!=root.parent):
+        root = Path(self.static_folder)
+        target = root.joinpath(*filename.split('/'))
+        # Refuse links and directory junctions, even when they stay inside the release.
+        if target.resolve() != target or not target.is_file():
             abort(404)
-        resolved=target.resolve()
-        if not resolved.is_relative_to(root) or not resolved.is_file():
-            abort(404)
-        return send_file(resolved,mimetype=PUBLIC_ASSETS[filename],conditional=True,max_age=3600)
+        return send_file(target,mimetype=PUBLIC_ASSETS[filename],conditional=True,max_age=3600)
 
     def log_exception(self, exc_info):
         # Framework tracebacks can include exception messages, SQL or source lines.
@@ -42,6 +44,14 @@ def configure_security(app):
             raise RuntimeError('Production debugging and exception propagation must be disabled.')
         if not app.config.get('TRUSTED_HOSTS'):
             raise RuntimeError('Configure APP_TRUSTED_HOSTS before production use.')
+        from security_email import trusted_origin
+        try:
+            public_url = trusted_origin(app.config['AUTH_PUBLIC_URL'], https_only=True)
+        except ValueError:
+            raise RuntimeError('Set AUTH_PUBLIC_URL to the canonical HTTPS portal origin.') from None
+        host = urlsplit(public_url).hostname
+        if not any(host == trusted.strip('[]').lower() for trusted in app.config['TRUSTED_HOSTS']):
+            raise RuntimeError('AUTH_PUBLIC_URL must use a hostname in APP_TRUSTED_HOSTS.')
         app.config.update(DEBUG=False,TESTING=False,PROPAGATE_EXCEPTIONS=False,
             TRAP_HTTP_EXCEPTIONS=False,SESSION_COOKIE_SECURE=True)
     app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax',
@@ -57,15 +67,15 @@ def configure_security(app):
         g.pop('portal_session', None)
         g.pop('csrf_token', None)
         g.pop('csrf_valid', None)
+        if isinstance(request.routing_exception, SecurityError):
+            raise request.routing_exception
         if app.config['PRODUCTION']:
             if app.debug or not request.is_secure:
                 abort(400)  # the TLS edge handles HTTP redirects, before accepting bodies
         if request.method not in ('GET','HEAD','OPTIONS'):
             origin=request.headers.get('Origin')
-            if origin:
-                parsed=urlsplit(origin)
-                if parsed.scheme not in ('http','https') or origin.rstrip('/')!=request.host_url.rstrip('/'):
-                    abort(403)
+            if origin is not None and origin != request.host_url.rstrip('/'):
+                abort(403)
             if request.headers.get('Sec-Fetch-Site')=='cross-site':abort(403)
 
     @app.after_request
@@ -80,10 +90,12 @@ def configure_security(app):
         # HTTPS CSRF also needs a same-origin referrer. Send only the origin,
         # never a patient path, query string or opaque-link token.
         response.headers['Referrer-Policy']='strict-origin'
+        response.headers['X-DNS-Prefetch-Control']='off'
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['X-Frame-Options']='DENY'
         response.headers['Content-Security-Policy']=("default-src 'self'; style-src 'self'; script-src 'self'; "
-            "img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; "
+            "img-src 'self' data:; font-src 'self'; media-src 'self'; connect-src 'self'; "
+            "object-src 'none'; frame-src 'none'; worker-src 'none'; "
             "form-action 'self'; frame-ancestors 'none'; base-uri 'self'")
         response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=(), payment=(), usb=()'
         if app.config['PRODUCTION'] and request.is_secure:

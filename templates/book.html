@@ -1,1 +1,38 @@
-{% extends 'base.html' %}{% block content %}<section class="form-page"><p class="eyebrow">YOUR NEXT STEP</p><h1>Request an appointment.</h1><p class="muted">Share your contact details and preferred time. The linked Privacy Notice is an unpublished draft; the approved privacy contact and effective date are pending. The practice will confirm the services and appointment arrangements available for your enquiry. Please do not include clinical information.</p><form method="post" class="panel form-grid"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Full name<input name="full_name" autocomplete="name" required maxlength="120" value="{{ values.get('full_name','') }}"></label><label>Email address<input type="email" name="email" autocomplete="email" required maxlength="254" value="{{ values.get('email','') }}"></label><label>Phone number<input type="tel" name="phone" autocomplete="tel" required maxlength="40" value="{{ values.get('phone','') }}"></label><label>Enquiry category<select name="service_type" required><option value="">Choose an enquiry category</option>{% for service in services %}<option {% if values.get('service_type')==service %}selected{% endif %}>{{ service }}</option>{% endfor %}</select></label><label class="full">Preferred date and time · Johannesburg<input type="datetime-local" name="preferred_at" required value="{{ values.get('preferred_at','') }}"></label><label class="checkbox full"><input type="checkbox" name="consent" required>I agree to the practice using these contact details to respond to this appointment enquiry only. <a href="{{ url_for('med.privacy_notice') }}">Read the draft POPIA / Privacy Notice.</a> This does not opt me into marketing or referral-information sharing.</label><div class="full"><button class="button">Send request ↗</button></div></form></section>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<section class="form-page">
+  <h1>Request an appointment.</h1>
+  <p>Use your own contact details even if you are enquiring for someone else. Keep identity documents, birth dates and clinical information out of this form.</p>
+  <section aria-labelledby="booking-costs">
+    <h2 id="booking-costs">Fees and booking terms</h2>
+    <p>Submitting this enquiry reserves no appointment and authorises no payment.</p>
+    {% for service, offer in terms.items() %}
+    <h3>{{ service }}</h3>
+    <dl class="care-details">
+      <dt>Fee</dt><dd>{{ offer.currency }} {{ offer.fee }}</dd>
+      <dt>Deposit</dt><dd>{{ offer.currency }} {{ offer.deposit }}</dd>
+      <dt>Cancellation</dt><dd>{{ offer.cancellation }}</dd>
+      <dt>Missed appointment</dt><dd>{{ offer.no_show }}</dd>
+      <dt>Refunds</dt><dd>{{ offer.refund }}</dd>
+    </dl>
+    {% endfor %}
+    {% if terms|length < services|length %}
+    <p>For services without terms listed here, ask the practice for the fee, currency, any deposit, and the cancellation, missed appointment and refund terms before confirming.</p>
+    {% endif %}
+  </section>
+  <form method="post" class="panel form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Your full name<input name="full_name" autocomplete="name" required maxlength="120" value="{{ values.get('full_name','') }}"></label>
+    <label>Your email address<input type="email" name="email" autocomplete="email" required maxlength="254" value="{{ values.get('email','') }}"></label>
+    <label>Your phone number<input type="tel" name="phone" autocomplete="tel" required maxlength="40" value="{{ values.get('phone','') }}"></label>
+    <label>Enquiry category<select name="service_type" required><option value="">Choose an enquiry category</option>{% for service in services %}<option {% if values.get('service_type')==service %}selected{% endif %}>{{ service }}</option>{% endfor %}</select></label>
+    <label class="full">Preferred date and time · Johannesburg<input type="datetime-local" name="preferred_at" required value="{{ values.get('preferred_at','') }}"></label>
+    <div class="full">
+      <p><a href="{{ url_for('med.privacy_notice') }}">Read the draft POPIA / Privacy Notice.</a> It is an unpublished draft. The practice still needs to confirm the privacy contact and effective date.</p>
+      <label class="checkbox"><input type="checkbox" name="consent" required>I agree to the practice using these contact details to respond to this appointment enquiry only.</label>
+      <p>This agreement does not opt me into marketing or referral-information sharing. Treatment consent and authority to act for someone else are handled separately.</p>
+    </div>
+    <div class="full"><button class="button">Send request</button></div>
+  </form>
+</section>
+{% endblock %}

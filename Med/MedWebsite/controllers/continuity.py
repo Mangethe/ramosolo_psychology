@@ -3,7 +3,7 @@ from flask_login import current_user
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
-from access import (accessible_patient, appointment_institution, audit, audit_views, can_patient, continuity_scope,
+from access import (accessible_patient, appointment_assignment, appointment_institution, audit, audit_views, can_patient, continuity_scope,
                     patient_scope, require_roles, require_capability)
 from models import (Appointment, CarePlan, ContinuityEvent, ContinuityNotification, Patient, PatientPreference, User)
 from medical_services import parse_local, utcnow
@@ -136,7 +136,7 @@ def create_continuity_event():
     if kind in ('missed_appointment', 'unconfirmed_booking', 'failed_reminder'):
         appointment = db.session.scalar(select(Appointment).where(
             Appointment.id == request.form.get('appointment_id', type=int),
-            Appointment.patient_id == patient.id, appointment_institution(patient.institution_id)))
+            Appointment.patient_id == patient.id, appointment_institution(patient.institution_id), appointment_assignment()))
         if not appointment:
             abort(400)
         if kind == 'missed_appointment' and (appointment.status != 'no_show' or appointment.starts_at > utcnow()):

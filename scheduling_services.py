@@ -112,9 +112,16 @@ def history(appointment,action,old=None,new=None,reason='',proposal=None,actor=N
         action=action,original_at=old,new_at=new,reason=reason))
 
 
+def pending_proposals(appointment):
+    return select(AppointmentProposal).where(
+        AppointmentProposal.appointment_id == appointment.id,
+        AppointmentProposal.institution_id == appointment.patient.institution_id,
+        AppointmentProposal.state == 'pending')
+
+
 def expire_proposals(appointment):
-    for p in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,
-            AppointmentProposal.state=='pending').with_for_update().execution_options(populate_existing=True)):
+    for p in db.session.scalars(pending_proposals(appointment).with_for_update()
+                                .execution_options(populate_existing=True)):
         if p.expires_at<=utcnow():
             p.state='expired';history(appointment,'proposal_expired',proposal=p)
 
@@ -152,6 +159,7 @@ def refresh_reminders(appointment):
                     due=appointment.starts_at-timedelta(minutes=minutes)
                     if due<utcnow()-timedelta(minutes=policy['catchup_minutes']):continue
                     duplicate=db.session.scalar(select(outbox.c.id).where(outbox.c.appointment_id==appointment.id,
+                        outbox.c.institution_id==appointment.patient.institution_id,
                         outbox.c.appointment_version==appointment.schedule_version,outbox.c.lead_minutes==minutes,
                         outbox.c.channel=='in_app'))
                     if duplicate:continue
@@ -183,8 +191,7 @@ def change(appointment,patient,starts,expected,reason,proposal=None):
     if result.rowcount!=1:abort(409)
     db.session.refresh(appointment)
     history(appointment,'proposal_accepted' if proposal else 'staff_confirmed_change',old,starts,reason,proposal)
-    for other in db.session.scalars(select(AppointmentProposal).where(
-            AppointmentProposal.appointment_id==appointment.id,AppointmentProposal.state=='pending')):
+    for other in db.session.scalars(pending_proposals(appointment)):
         other.state='accepted' if proposal and other.id==proposal.id else 'superseded'
         other.responded_at=utcnow()
     refresh_reminders(appointment)
@@ -198,8 +205,7 @@ def propose(appointment, patient, starts, expected, reason):
     if not reason or len(reason)>240:abort(400)
     validate_slot(patient,starts,appointment.care_type or 'outpatient',appointment.visit_kind or 'followup',appointment.id)
     expire_proposals(appointment)
-    for old in db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.appointment_id==appointment.id,
-            AppointmentProposal.state=='pending')):
+    for old in db.session.scalars(pending_proposals(appointment)):
         old.state='superseded';history(appointment,'proposal_superseded',proposal=old)
     db.session.flush()
     token=secrets.token_urlsafe(32);code=str(secrets.randbelow(1000000)).zfill(6)
@@ -214,7 +220,7 @@ def propose(appointment, patient, starts, expected, reason):
         decision=latest_decision(patient.id,'administrative_contact','email')
         proposal.communication_decision_id=decision.id
         sink=current_app.config.get('CALENDAR_SYNTHETIC_DELIVERIES')
-        if isinstance(sink,list):sink.append({'proposal_id':proposal.id,'destination':decision.destination,
+        if current_app.testing and isinstance(sink,list):sink.append({'proposal_id':proposal.id,'destination':decision.destination,
             'token':token,'code':code,'text':'Please review a proposed appointment time. The original booking remains confirmed.'})
     audit('propose_change','appointment',appointment.id)
     return proposal

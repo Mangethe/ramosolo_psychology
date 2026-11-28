@@ -78,6 +78,31 @@ def test_crafted_mutations_ignore_client_role_and_institution(env,role):
     assert r.status_code==(302 if role is None else 403)
 
 
+@pytest.mark.parametrize('role', ['dr', 'dr_assist'])
+def test_appointment_reads_require_the_staff_schedule_assignment(env, role, monkeypatch):
+    from datetime import datetime
+    from Med.MedWebsite.controllers import portal
+
+    patient = env[2][0]
+    now = datetime(2032, 11, 4, 8)
+    monkeypatch.setattr(portal, 'utcnow', lambda: now)
+    appointment = Appointment(patient_id=patient.id, doctor_id=env[1]['dr2'].id,
+        starts_at=now + timedelta(hours=1), service='Synthetic other clinician service',
+        institution_id=patient.institution_id, status='scheduled')
+    db.session.add(appointment)
+    db.session.commit()
+    client = as_user(env, role)
+    for path in ('/med', '/med/appointments', '/med/calendar', f'/med/patients/{patient.id}'):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert b'Synthetic other clinician service' not in response.data
+    assert client.get('/med/calendar/availability', query_string={
+        'patient_id': patient.id, 'appointment_id': appointment.id, 'day': '2032-11-04'}).status_code == 404
+    assert client.post(f'/med/appointments/{appointment.id}/status',
+        data={'status': 'cancelled', 'version': 1}).status_code == 404
+    assert b'Synthetic other clinician service' in as_user(env, 'patient').get('/med/appointments').data
+
+
 def test_static_asset_inventory_and_source_download_probes(env,tmp_path):
     app=env[0];root=tmp_path/'public';root.mkdir();(root/'css').mkdir()
     (root/'css/style.css').write_text('body { color: black; }',encoding='utf-8')
@@ -118,16 +143,32 @@ def test_static_symlink_cannot_escape_public_root(env,tmp_path):
     env[0].static_folder=str(root)
     r=env[0].test_client().get('/static/css/style.css')
     assert r.status_code==404 and SECRET.encode() not in r.data
+    (root/'css/style.css').unlink()
+    (root/'css/style.css').write_text(SECRET, encoding='utf-8')
+    linked_root = tmp_path/'linked-public'
+    linked_root.symlink_to(root, target_is_directory=True)
+    env[0].static_folder = str(linked_root)
+    r = env[0].test_client().get('/static/css/style.css')
+    assert r.status_code == 404 and SECRET.encode() not in r.data
 
 
 def test_generic_errors_do_not_render_or_log_canary_exception(env,caplog):
+    from flask import request
     app=env[0];app.config.update(PROPAGATE_EXCEPTIONS=False)
-    @app.get('/synthetic-error-probe')
-    def synthetic_error():
-        raise RuntimeError(SECRET)
-    client=app.test_client();r=client.get('/synthetic-error-probe')
-    assert r.status_code==500 and SECRET.encode() not in r.data
-    assert SECRET not in caplog.text and 'Unhandled application error type=RuntimeError' in caplog.text
+    @app.post('/synthetic-error-probe/<opaque>')
+    def synthetic_error(opaque):
+        raise RuntimeError([opaque, request.args['q'], request.cookies['test_cookie'],
+                            request.headers['Authorization'], *request.form.values()])
+    client=app.test_client()
+    client.set_cookie('test_cookie', 'synthetic-cookie-canary')
+    values = {'password': SECRET, 'otp': 'synthetic-otp-canary', 'clinical': CLINICAL}
+    canaries = (*values.values(), 'synthetic-path-canary', 'synthetic-query-canary',
+                'synthetic-cookie-canary', 'synthetic-auth-canary')
+    r=client.post('/synthetic-error-probe/synthetic-path-canary?q=synthetic-query-canary',
+                  data=values, headers={'Authorization': 'Bearer synthetic-auth-canary'})
+    assert r.status_code==500
+    assert all(value not in caplog.text and value.encode() not in r.data for value in canaries)
+    assert 'Unhandled application error type=RuntimeError endpoint=synthetic_error' in caplog.text
     for path,method,data,code in [('/auth/logout','get',None,405),('/book','post',{'x':'x'*140000},413),('/not-a-route','get',None,404)]:
         r=getattr(client,method)(path,data=data)
         assert r.status_code==code and r.headers['Cache-Control']=='no-store'
@@ -168,17 +209,27 @@ def test_real_login_expiry_idle_absolute_and_cookie_payload(env):
     assert client.get('/med').status_code==302
 
 
-def production_env(monkeypatch,sslmode='require'):
+def production_env(monkeypatch,sslmode='verify-full'):
     monkeypatch.setenv('APP_ENV','production');monkeypatch.setenv('FLASK_SECRET_KEY','synthetic-only-32-character-signing-key')
     monkeypatch.setenv('DATABASE_URL','postgresql://synthetic_runtime@localhost/synthetic?sslmode='+sslmode)
     monkeypatch.setenv('APP_TRUSTED_HOSTS','portal.example.test');monkeypatch.setenv('FLASK_DEBUG','0')
+    monkeypatch.setenv('AUTH_PUBLIC_URL', 'https://portal.example.test')
     monkeypatch.setenv('APP_TRUSTED_PROXY_HOPS','0')
 
 
-@pytest.mark.parametrize('mode',['disable','allow','prefer',''])
+@pytest.mark.parametrize('mode',['disable','allow','prefer','require','verify-ca',''])
 def test_production_rejects_weak_database_tls(monkeypatch,mode):
     production_env(monkeypatch,mode)
-    with pytest.raises(RuntimeError,match='secure sslmode'):settings()
+    with pytest.raises(RuntimeError,match='sslmode=verify-full'):settings()
+
+
+@pytest.mark.parametrize('origin', ['http://portal.example.test', 'https://other.example.test',
+    'https://portal.example.test:invalid', 'https://portal.example.test/#', 'https://@portal.example.test'])
+def test_production_rejects_misconfigured_portal_origin(monkeypatch, origin):
+    production_env(monkeypatch)
+    monkeypatch.setenv('AUTH_PUBLIC_URL', origin)
+    with pytest.raises(RuntimeError, match='AUTH_PUBLIC_URL'):
+        create_app()
 
 
 def test_production_host_https_debug_and_proxy_boundaries(monkeypatch):
@@ -193,8 +244,16 @@ def test_production_host_https_debug_and_proxy_boundaries(monkeypatch):
     assert app.config['SESSION_COOKIE_SECURE'] and app.config['SESSION_COOKIE_HTTPONLY']
     assert not app.debug and not app.config['PROPAGATE_EXCEPTIONS']
     monkeypatch.setenv('APP_TRUSTED_PROXY_HOPS','1')
-    proxy_app=create_app();r=proxy_app.test_client().get('/',base_url='http://portal.example.test',headers={'X-Forwarded-Proto':'https'})
-    assert r.status_code==200
+    proxy_app = create_app()
+    from flask import request
+
+    @proxy_app.get('/synthetic-proxy-test')
+    def proxy_test():
+        return {'address': request.remote_addr}
+
+    r = proxy_app.test_client().get('/synthetic-proxy-test', base_url='http://portal.example.test',
+        headers={'X-Forwarded-Proto': 'http, https', 'X-Forwarded-For': '192.0.2.80, 192.0.2.1'})
+    assert r.status_code == 200 and r.json == {'address': '192.0.2.1'}
     monkeypatch.setenv('FLASK_DEBUG','1')
     with pytest.raises(RuntimeError,match='FLASK_DEBUG'):create_app()
     monkeypatch.setenv('FLASK_DEBUG','0');monkeypatch.delenv('APP_TRUSTED_HOSTS')
@@ -219,6 +278,31 @@ def test_csrf_normal_forms_cors_and_cross_origin_posts(env):
     assert client.get('/med').status_code==200
     assert client.get('/med',headers={'Origin':'https://attacker.example.test'}).headers.get('Access-Control-Allow-Origin') is None
     assert response.headers['Referrer-Policy']=='strict-origin'
+
+
+def test_waitress_accepts_forwarding_only_from_the_configured_peer(monkeypatch):
+    from flask import request
+    from waitress.proxy_headers import proxy_headers_middleware
+
+    production_env(monkeypatch)
+    app = create_app()
+
+    @app.get('/synthetic-proxy-test')
+    def proxy_test():
+        return {'address': request.remote_addr}
+
+    app.wsgi_app = proxy_headers_middleware(app.wsgi_app, trusted_proxy='127.0.0.1',
+        trusted_proxy_count=1, trusted_proxy_headers={'x-forwarded-for', 'x-forwarded-proto'})
+    client = app.test_client()
+    headers = {'X-Forwarded-Proto': 'https', 'X-Forwarded-For': '192.0.2.1',
+               'X-Forwarded-Host': 'untrusted.example.test'}
+    port = 'http://portal.example.test'
+    trusted = client.get('/synthetic-proxy-test', base_url=port, headers=headers,
+                         environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert trusted.status_code == 200 and trusted.json == {'address': '192.0.2.1'}
+    assert 'Strict-Transport-Security' in trusted.headers
+    assert client.get('/synthetic-proxy-test', base_url=port, headers=headers,
+                      environ_overrides={'REMOTE_ADDR': '192.0.2.2'}).status_code == 400
 
 
 def test_clinical_submission_stays_out_of_cookies_redirects_and_logs(env,caplog):
@@ -255,3 +339,94 @@ def test_login_rejects_oversized_values_without_truncation(env):
     assert r.status_code==200 and b'Unable to sign in' in r.data
     r=client.post('/auth/login',data={'email':'x'*260+'@example.test','password':'Testing-password-123'})
     assert r.status_code==200 and b'Unable to sign in' in r.data
+
+
+def test_auth_throttle_is_shared_private_and_precedes_password_hashing(env, monkeypatch):
+    import auth
+    from models import DeliveryLimit
+
+    app = env[0]
+    clock = [100_000]
+    hashes = []
+    monkeypatch.setattr(auth.portal_sessions, 'clock', lambda: clock[0])
+
+    def failed_password(*args):
+        hashes.append(None)
+        return False
+
+    monkeypatch.setattr(auth, 'check_password_hash', failed_password)
+    form = {'email': 'missing@example.test', 'password': 'synthetic-invalid'}
+    for index in range(60):
+        response = app.test_client().post('/auth/login', data=form,
+            environ_overrides={'REMOTE_ADDR': f'2001:db8::1:{index}'})
+        assert response.status_code == 200
+    client = app.test_client()
+    response = client.post('/auth/login', data=form, environ_overrides={'REMOTE_ADDR': '2001:db8::2'},
+                           headers={'X-Forwarded-For': '192.0.2.2'})
+    assert response.status_code == 429 and response.headers['Retry-After'] == '900'
+    assert response.headers['Cache-Control'] == 'no-store' and len(hashes) == 60
+    for _ in range(10):
+        assert client.post('/auth/verification', data=form,
+            environ_overrides={'REMOTE_ADDR': '2001:db8::2'}).status_code == 302
+    assert client.post('/auth/verification', data=form,
+        environ_overrides={'REMOTE_ADDR': '2001:db8::2'}).status_code == 429
+    keys = db.session.scalars(select(DeliveryLimit.key)).all()
+    assert len(keys) == 2 and all(re.fullmatch(r'auth:[0-9a-f]{64}', key) for key in keys)
+    clock[0] += 900
+    assert client.post('/auth/login', data=form,
+        environ_overrides={'REMOTE_ADDR': '2001:db8::2'}).status_code == 200
+
+
+def test_invalid_origin_fails_without_parsing_or_reserving_auth_limit(env):
+    from models import DeliveryLimit
+
+    response = env[0].test_client().post('/auth/login', headers={'Origin': 'https://['})
+    assert response.status_code == 403
+    assert db.session.scalar(select(func.count()).select_from(DeliveryLimit)) == 0
+
+
+def test_every_registered_post_rejects_missing_csrf(env):
+    app = env[0]
+    app.config['WTF_CSRF_ENABLED'] = True
+    client = app.test_client()
+    for rule in app.url_map.iter_rules():
+        if 'POST' in rule.methods:
+            _, path = rule.build(dict.fromkeys(rule.arguments, 1))
+            assert client.post(path).status_code == 400, rule.endpoint
+
+
+def test_release_scan_reads_public_zip_members_and_skips_private_members(tmp_path, monkeypatch):
+    from stat import S_IFLNK
+    from zipfile import ZipFile, ZipInfo
+    from verification.check_release_secrets import artifact_inventory
+
+    release = tmp_path / 'synthetic-release.zip'
+    with ZipFile(release, 'w') as archive:
+        archive.writestr('release/.env', b'Excluded synthetic fixture')
+        archive.writestr('release/.env/private.py', b'Excluded synthetic fixture')
+        archive.writestr('release/.flaskenv', b'Excluded synthetic fixture')
+        archive.writestr('release/.env. /private.py', b'Excluded synthetic fixture')
+        archive.writestr('release/static/style.css:private.txt', b'Excluded synthetic fixture')
+        archive.writestr('release/.env.example', b'AUTH_OIDC_CLIENT_SECRET=replace-with-injected-secret')
+        archive.writestr('release/static/app.css', '/*\nGMAIL_APP_PASSWORD=' + 'abcd ' * 3 + 'abcd\n*/')
+        archive.writestr('release/Caddyfile', 'AUTH_MFA_KEY=' + '0' * 32)
+        archive.writestr('release/deploy.json', '{\n"GMAIL_OAUTH_CLIENT_SECRET": "' + '0' * 20 + '"\n}')
+        linked = ZipInfo('release/static/linked.css')
+        linked.create_system = 3
+        linked.external_attr = (S_IFLNK | 0o777) << 16
+        archive.writestr(linked, '../private.css')
+    original = ZipFile.read
+
+    def public_read(self, entry, *args, **kwargs):
+        assert entry.filename in ('release/.env.example', 'release/static/app.css',
+                                  'release/Caddyfile', 'release/deploy.json')
+        return original(self, entry, *args, **kwargs)
+
+    monkeypatch.setattr(ZipFile, 'read', public_read)
+    assert artifact_inventory(release) == {('release/.env', 'excluded path'),
+        ('release/.flaskenv', 'excluded path'),
+        ('release/.env/private.py', 'excluded path'), ('release/static/linked.css', 'excluded path'),
+        ('release/.env. /private.py', 'excluded path'), ('release/static/style.css:private.txt', 'excluded path'),
+        ('release/Caddyfile', 'literal environment signing key'),
+        ('release/deploy.json', 'literal provider or SMS credential'),
+        ('release/static/app.css', 'literal provider or SMS credential')}

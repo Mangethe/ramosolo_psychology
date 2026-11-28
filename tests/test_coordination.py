@@ -319,6 +319,19 @@ def test_existing_scheduling_followup_is_not_duplicated_in_my_actions(env):
     assert as_user(env,'dr').post('/med/actions/scheduling/42',data={'version':1,'status':'acknowledged'}).status_code==302
     assert db.session.execute(text('SELECT state FROM attendance_followups')).scalar()=='acknowledged'
 
+    # A stale follow-up must not give the patient's current team access to another schedule.
+    appointment = env[3][0]
+    other_doctor = env[2][1].doctor_id
+    appointment.starts_at += timedelta(minutes=5)
+    appointment.doctor_id = other_doctor
+    db.session.commit()
+    for role in ('dr', 'dr_assist'):
+        client = as_user(env, role)
+        assert b'attendance:42' not in client.get('/med/actions?type=continuity').data
+        assert client.get('/med/actions/scheduling/42').status_code == 404
+        assert client.post('/med/actions/scheduling/42', data={'version': 2, 'status': 'resolved'}).status_code == 404
+    assert db.session.execute(text('SELECT state FROM attendance_followups')).scalar() == 'acknowledged'
+
 
 def test_patient_only_explicitly_shared_actions_and_private_review_excluded(env):
     row=discharged(env);_,ref,_=new_referral(env)

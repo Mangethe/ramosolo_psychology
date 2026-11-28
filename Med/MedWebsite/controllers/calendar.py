@@ -6,7 +6,7 @@ from sqlalchemy import select, update
 from extensions import db
 from models import (Patient, Appointment, AppointmentProposal, CalendarBlock,
     CalendarDelegation, CalendarHistory, Membership, User)
-from access import require_roles, accessible_patient, patient_scope, audit, audit_views
+from access import require_roles, accessible_patient, appointment_assignment, patient_scope, audit, audit_views
 from medical_services import utcnow, parse_local, SERVICES
 from scheduling_services import (available_slots, lock_doctor, propose, change,
     digest, history, expire_proposals, occupied_until)
@@ -31,8 +31,8 @@ def scoped_appointment(identity):
 def calendar():
     from access import appointment_institution
     patients=list(db.session.scalars(patient_scope().order_by(Patient.name)))
-    rows=list(db.session.scalars(select(Appointment).where(Appointment.patient_id.in_([p.id for p in patients]),
-        Appointment.doctor_id.in_({p.doctor_id for p in patients}),
+    rows=list(db.session.scalars(select(Appointment).join(Patient, Patient.id == Appointment.patient_id).where(
+        Appointment.patient_id.in_([p.id for p in patients]), Appointment.doctor_id == Patient.doctor_id,
         appointment_institution(g.membership.institution_id)).order_by(Appointment.starts_at)))
     proposals=list(db.session.scalars(select(AppointmentProposal).where(AppointmentProposal.institution_id==g.membership.institution_id,
         AppointmentProposal.appointment_id.in_([a.id for a in rows])).order_by(AppointmentProposal.created_at.desc())))
@@ -57,7 +57,7 @@ def calendar_availability():
         exclude=request.args.get('appointment_id',type=int)
         if exclude:
             row=db.session.scalar(select(Appointment).where(Appointment.id==exclude,Appointment.patient_id==patient.id,
-                appointment_institution(patient.institution_id)))
+                appointment_institution(patient.institution_id), appointment_assignment()))
             if not row:abort(404)
             care=row.care_type or 'outpatient';kind=row.visit_kind or 'followup'
         slots=available_slots(patient,day,care,kind,exclude)
@@ -87,10 +87,14 @@ def calendar_expire(appointment_id):
     return redirect(url_for('med.calendar'))
 
 
-@bp.route('/med/calendar/proposals/<proposal_key>/respond',methods=['GET','POST'])
+@bp.route('/med/calendar/proposals/<int:proposal_id>/respond', methods=['GET', 'POST'])
+@bp.route('/med/calendar/proposals/<proposal_key>/respond', methods=['GET', 'POST'])
 @require_roles('patient')
-def member_proposal(proposal_key):
-    proposal=db.session.scalar(select(AppointmentProposal).where(AppointmentProposal.token_digest==proposal_key,
+def member_proposal(proposal_id=None, proposal_key=None):
+    # Existing links continue to work. New pages need only a scoped record ID.
+    identity = (AppointmentProposal.id == proposal_id if proposal_id is not None
+                else AppointmentProposal.token_digest == proposal_key)
+    proposal=db.session.scalar(select(AppointmentProposal).where(identity,
         AppointmentProposal.institution_id==g.membership.institution_id,
         AppointmentProposal.appointment_id.in_(select(Appointment.id).where(
             Appointment.patient_id.in_(patient_scope().with_only_columns(Patient.id))))))
@@ -101,7 +105,10 @@ def member_proposal(proposal_key):
 
 def respond(proposal,patient,row):
     if request.method=='POST':
-        proposal=db.session.scalar(select(AppointmentProposal).where(AppointmentProposal.id==proposal.id).with_for_update().execution_options(populate_existing=True))
+        proposal=db.session.scalar(select(AppointmentProposal).where(AppointmentProposal.id==proposal.id,
+            AppointmentProposal.institution_id==patient.institution_id,
+            AppointmentProposal.appointment_id==row.id).with_for_update().execution_options(populate_existing=True))
+        if not proposal:abort(404)
         if proposal.state!='pending':abort(409)
         if proposal.expires_at<=utcnow():
             expire_proposals(row);db.session.commit();abort(410)
@@ -133,7 +140,16 @@ def guest_proposal(token):
             appointment.institution_id not in (None, patient.institution_id) or
             appointment.doctor_id!=patient.doctor_id):abort(404)
     lock_doctor(appointment.doctor_id,proposal.institution_id)
-    db.session.refresh(appointment);db.session.refresh(proposal)
+    appointment_id, patient_id = appointment.id, patient.id
+    doctor_id, institution_id = appointment.doctor_id, proposal.institution_id
+    db.session.refresh(patient, with_for_update=True)
+    db.session.refresh(appointment, with_for_update=True)
+    db.session.refresh(proposal, with_for_update=True)
+    if (proposal.appointment_id != appointment_id or proposal.institution_id != institution_id or
+            appointment.patient_id != patient_id or appointment.doctor_id != doctor_id or
+            appointment.institution_id not in (None, institution_id) or patient.institution_id != institution_id or
+            patient.doctor_id != doctor_id or patient.user_id is not None):
+        abort(404)
     if proposal.expires_at<=utcnow() or proposal.state!='pending':abort(410)
     if proposal.verification_attempts>=5:abort(429)
     from coordination_services import latest_decision, verified_communication_allowed

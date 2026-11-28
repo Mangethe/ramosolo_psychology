@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import hmac
+from ipaddress import ip_address, ip_network
 from flask import Blueprint, current_app, g, render_template, request, redirect, url_for, flash, session, abort
 from flask_login import current_user, login_required
 from sqlalchemy import delete, select
@@ -8,10 +10,28 @@ from models import AccountVerification, Authenticator, PendingAuthentication, Po
 import portal_sessions
 import account_verification
 import multi_factor
+from delivery_limits import reserve
 from security_email import enqueue
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 DUMMY_HASH = generate_password_hash('not-a-real-account-password')
+
+
+def throttle(operation, maximum):
+    """Reserve a short-lived client bucket across workers before expensive auth work."""
+    try:
+        address = ip_address(request.remote_addr or '')
+    except ValueError:
+        address = None
+    if address and address.version == 6:
+        address = address.ipv4_mapped or ip_network((address, 64), strict=False).network_address
+    key = current_app.secret_key
+    key = key.encode() if isinstance(key, str) else key
+    identifier = hmac.digest(key, f'auth:{operation}:{address}'.encode(), 'sha256').hex()
+    allowed = reserve(portal_sessions.clock(), ('auth:' + identifier, 900, maximum))
+    db.session.commit()
+    if not allowed:
+        abort(429, retry_after=900)
 
 
 def browser_description():
@@ -64,6 +84,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('med.dashboard'))
     if request.method == 'POST':
+        throttle('password', 60)
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         valid_input=bool(email and '@' in email and len(email)<=254 and 1<=len(password)<=512)
@@ -116,6 +137,7 @@ def session_extend():
 @bp.route('/verify', methods=['GET', 'POST'])
 def verify_email():
     if request.method == 'POST':
+        throttle('verify-email', 30)
         if account_verification.confirm(request.form.get('token', '')):
             flash('Email confirmed. You can now sign in if your account has been activated.', 'success')
             return redirect(url_for('auth.login'))
@@ -127,6 +149,7 @@ def verify_email():
 @bp.route('/verification', methods=['GET', 'POST'])
 def resend_verification():
     if request.method == 'POST':
+        throttle('resend-email', 10)
         email = request.form.get('email', '').strip().lower()
         if account_verification.valid_address(email):
             user = db.session.scalar(select(User).where(User.email == email).with_for_update())

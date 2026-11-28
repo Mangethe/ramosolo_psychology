@@ -486,6 +486,13 @@ section[id]{scroll-margin-top:24px}
   .inline-form{flex-wrap:wrap}
   .public-footer nav a{min-height:44px;display:flex;align-items:center}
 }
+.general-questions{max-width:42rem;width:var(--public-width,calc(100% - 2rem));margin:2rem auto;padding:1.25rem 1.5rem}
+.general-questions summary{cursor:pointer;font-weight:700;color:var(--deep);padding:.45rem 0}
+.general-question-options:not([hidden]){display:flex;flex-wrap:wrap;gap:.5rem;list-style:none;padding:0;margin:1rem 0}
+.general-question-options button{border:1px solid var(--border);border-radius:.65rem;background:var(--sage);color:var(--deep);padding:.55rem .8rem;min-height:44px;text-align:left;font:inherit;cursor:pointer}
+.general-question-options button:hover{border-color:var(--green)}
+.general-question-reply:not(:empty){background:var(--sage);border-radius:.75rem;padding:1rem;margin-top:1rem}
+.general-question-reply p{margin:.4rem 0 0}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }

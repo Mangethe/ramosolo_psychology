@@ -79,9 +79,13 @@ def test_proposal_accept_preserves_id_and_original_until_acceptance(calendar_env
     env,_,day=calendar_env;a=env[3][0];original=a.starts_at
     p=proposal(env,day);assert p and a.starts_at==original and a.status=='scheduled'
     url=f'/med/calendar/proposals/{p.token_digest}/respond'
+    member_url = f'/med/calendar/proposals/{p.id}/respond'
+    listing = as_user(env, 'patient').get('/med/appointments')
+    assert member_url.encode() in listing.data and p.token_digest.encode() not in listing.data
+    assert as_user(env, 'otherpatient').get(member_url).status_code == 404
     assert as_user(env,'otherpatient').post(url,data={'decision':'accepted'}).status_code==404
     assert as_user(env,'patient').get(url).status_code==200 and p.state=='pending'
-    assert as_user(env,'patient').post(url,data={'decision':'accepted'}).status_code==200
+    assert as_user(env,'patient').post(member_url,data={'decision':'accepted'}).status_code==200
     assert a.starts_at==p.proposed_at and a.schedule_version==2 and p.state=='accepted'
     assert db.session.scalar(select(func.count(Appointment.id)))==3
     assert as_user(env,'patient').post(url,data={'decision':'accepted'}).status_code==409
@@ -140,6 +144,20 @@ def test_future_cancellation_invalidates_proposal(calendar_env):
     assert client.post(f'/med/appointments/{a.id}/status',data={'status':'cancelled','version':0}).status_code==409
     assert client.post(f'/med/appointments/{a.id}/status',data={'status':'cancelled','version':1}).status_code==302
     assert a.status=='cancelled' and p.state=='superseded'
+
+
+def test_cancellation_leaves_legacy_proposal_from_another_institution_untouched(calendar_env):
+    env, _, day = calendar_env
+    appointment = env[3][0]
+    pending = proposal(env, day)
+    pending.institution_id = env[2][2].institution_id
+    db.session.commit()
+
+    client = as_user(env, 'dr')
+    assert client.post(f'/med/appointments/{appointment.id}/status',
+        data={'status': 'cancelled', 'version': appointment.schedule_version}).status_code == 302
+    assert appointment.status == 'cancelled'
+    assert pending.state == 'pending' and pending.responded_at is None
 
 
 def test_guest_opaque_link_code_consent_and_synthetic_delivery(calendar_env):

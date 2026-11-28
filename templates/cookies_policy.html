@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Cookies policy · Ramosolo{% endblock %}
+{% block content %}
+<article class="prose policy-page">
+  <h1>Cookies policy</h1>
+  {% include 'partials/_policy_status.html' %}
+  <h2>Essential cookies</h2>
+  <dl class="care-details">
+    <dt><code>session</code> (default name)</dt>
+    <dd>Keeps you signed in and protects forms against unauthorised submissions. It can also hold temporary notices and sign-in steps. Your browser may receive it before sign-in when you open a protected form.</dd>
+    <dt><code>remember_token</code> (legacy name)</dt>
+    <dd>The current portal signs in without a remember-me cookie. It may instruct your browser to clear a cookie left by an older version.</dd>
+  </dl>
+  <p>The portal defaults to 15 minutes of inactivity and a two-hour maximum signed-in session. The server checks session expiry and revocation even if a cookie is still present in your browser. The session cookie is HttpOnly, SameSite=Lax and Secure in production.</p>
+  <h2>Optional cookies and the general questions chatbot</h2>
+  <p>The portal uses essential cookies. This application includes no advertising, analytics or session replay cookies. The chatbot shows fixed answers in your browser. It neither sets cookies nor stores or sends your selections.</p>
+  <h2>Browser controls</h2>
+  <p>You can clear or block this site's cookies in your browser. Clearing them can sign you out, and blocking them can prevent sign-in and form submission. Sign out on shared devices.</p>
+  <p>See the <a href="{{ url_for('med.privacy_notice') }}">privacy notice</a> for the wider handling of personal information and the proposed rights-request process.</p>
+</article>
+{% endblock %}

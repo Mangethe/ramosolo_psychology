@@ -2,6 +2,11 @@
 .env
 .env.*
 !.env.example
+.flaskenv
+.pgpass
+pgpass.conf
+.npmrc
+.pypirc
 
 # Python
 .venv/

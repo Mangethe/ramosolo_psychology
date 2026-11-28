@@ -10,7 +10,7 @@ from flask_login import current_user
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 
-from auth import begin_login, reauthenticate
+from auth import begin_login, reauthenticate, throttle
 from extensions import db
 from models import AccountVerification, Authenticator, FederatedIdentity, OIDCExchange, User
 from portal_sessions import clock, digest, rotate
@@ -80,6 +80,7 @@ def begin():
     link = request.form.get('action') == 'link'
     if link != current_user.is_authenticated:
         abort(403)
+    throttle('oidc-start', 30)
     portal = getattr(g, 'portal_session', None)
     if link:
         user = db.session.get(User, current_user.id, with_for_update=True, populate_existing=True)

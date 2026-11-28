@@ -15,6 +15,7 @@ from mail_delivery import DeliveryFailure
 from models import AccountVerification, DeliveryLimit, EmailDeliveryRun, SecurityEmail, User
 from portal_sessions import clock
 
+ACCOUNT_EMAIL_KINDS = frozenset({'verify', 'welcome', 'login', 'change'})
 
 @dataclass(frozen=True)
 class Message:
@@ -36,14 +37,18 @@ class FakeMailProvider:
 
 def trusted_origin(value, *, https_only=False):
     parsed = urlsplit(value)
+    port = parsed.port
     if (parsed.scheme not in (('https',) if https_only else ('http', 'https')) or
-            not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or
-            parsed.path not in ('', '/') or any(char.isspace() for char in value) or '\\' in value):
+            not parsed.hostname or parsed.username is not None or '?' in value or '#' in value or
+            port == 0 or parsed.path not in ('', '/') or
+            any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value) or '\\' in value):
         raise ValueError('Expected a trusted portal origin.')
     return value.rstrip('/')
 
 
 def enqueue(user, kind, key, *, detail=None, recipient=None):
+    if kind not in ACCOUNT_EMAIL_KINDS:
+        raise ValueError('Unsupported account email purpose.')
     now = clock()
     db.session.add(SecurityEmail(dedupe_key=key, user_id=user.id, recipient=recipient or user.email,
         kind=kind, detail=detail, created_at=now, next_attempt_at=now))
@@ -51,13 +56,15 @@ def enqueue(user, kind, key, *, detail=None, recipient=None):
 
 def render(job):
     from account_verification import verification_token
+    from appointment_email import SUBJECTS, render as render_appointment
 
+    if job.kind not in ACCOUNT_EMAIL_KINDS and job.kind not in SUBJECTS:
+        return None
     origin = trusted_origin(current_app.config['AUTH_PUBLIC_URL'],
                             https_only=current_app.config['PRODUCTION'])
     support = origin + '/auth/help'
-    if job.kind.startswith('appt_'):
-        from appointment_email import SUBJECTS, render as render_appointment
-        rendered = render_appointment(job, origin) if job.kind in SUBJECTS else None
+    if job.kind in SUBJECTS:
+        rendered = render_appointment(job, origin)
         return Message(job.recipient, *rendered, job.dedupe_key) if rendered else None
     user = db.session.execute(select(User.email, User.enabled).where(User.id == job.user_id)).first()
     if not user or (not user.enabled and job.kind != 'change'):

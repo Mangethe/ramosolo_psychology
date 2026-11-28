@@ -1,5 +1,6 @@
 """Template/route checks; these do not claim browser layout verification."""
 from html.parser import HTMLParser
+from xml.etree import ElementTree
 from urllib.parse import urlsplit
 from pathlib import Path
 import pytest
@@ -63,7 +64,9 @@ def test_public_shell_links_contact_details_and_no_external_dependencies(env,pat
         assert old not in text
     footer = text.split('<footer class="site-footer">', 1)[1].split('</footer>', 1)[0]
     assert all(CARD[field] in footer for field in ('address', 'cell', 'telephone', 'fax', 'email'))
-    assert not page.scripts
+    expected_scripts = [{'src': '/static/js/general-questions.js', 'defer': None}] if path in ('/', '/inpatient') else []
+    assert page.scripts == expected_scripts
+    assert ('general-questions' in page.ids) == bool(expected_scripts)
     assert all(not a.get('href','').startswith(('https://fonts.','https://cdn.')) for a in page.links)
     assert all(link['href'].startswith('/static/') for link in page.styles)
     assert 'ls-launcher' not in text and 'chat.message' not in text and '<style' not in text
@@ -91,3 +94,19 @@ def test_css_asset_focus_motion_and_disclosures(env):
         for block in ['title','content','head','extra_css','scripts']:assert 'block '+block in source
         assert "include 'partials/_navbar.html'" in source and "include 'partials/_footer.html'" in source
         assert "include 'partials/flashes.html'" in source
+
+
+def test_sitemap_uses_configured_origin_and_public_routes(env):
+    app = env[0]
+    app.config['AUTH_PUBLIC_URL'] = 'https://portal.example.test/'
+    client = app.test_client()
+    response = client.get('/sitemap.xml?example=synthetic', headers={'Host': 'untrusted.example.test'})
+    assert response.status_code == 200 and response.mimetype == 'application/xml'
+    namespace = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+    locations = [item.text for item in ElementTree.fromstring(response.data).findall('s:url/s:loc', namespace)]
+    assert set(locations) == {'https://portal.example.test' + path for path in
+                              ('/', '/book', '/inpatient', '/governance', '/sitemap')}
+
+    html_links = {link.get('href') for link in Page(client.get('/sitemap').get_data(as_text=True)).links}
+    assert {'/cookies-policy', '/privacy-notice', '/sitemap.xml', '/#general-questions'} <= html_links
+    assert b'general-questions.js' not in as_user(env, 'patient').get('/').data

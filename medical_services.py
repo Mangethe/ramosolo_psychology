@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import select, func
+from sqlalchemy import select, func, true
 from extensions import db
 from models import Appointment, Admission, Patient
 
@@ -17,12 +17,13 @@ def parse_local(value):
     return datetime.fromisoformat(value).replace(tzinfo=TZ).astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def statistics(patients, now=None, include_admissions=True):
+def statistics(patients, now=None, include_admissions=True, appointment_filter=None):
     now = now or utcnow()
     ids = [p.id for p in patients]
     latest = dict(db.session.execute(select(Appointment.patient_id, func.max(Appointment.starts_at))
         .join(Patient, Patient.id == Appointment.patient_id).where(
         Appointment.patient_id.in_(ids), Appointment.status == 'completed',
+        appointment_filter if appointment_filter is not None else true(),
         (Appointment.institution_id == Patient.institution_id) | Appointment.institution_id.is_(None),
         Appointment.starts_at <= now).group_by(Appointment.patient_id)).all())
     cutoff = now - timedelta(days=90)

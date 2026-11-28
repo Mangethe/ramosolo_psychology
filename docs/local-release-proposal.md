@@ -5,6 +5,98 @@ deploy. No live migration, grant/RLS change, notification or deployment was made
 during this review. Current local acceptance evidence is in
 `verification/acceptance-review.md`.
 
+## Privacy approval and staged activation
+
+Use the [practice decision sheet](privacy-approval-decision-sheet.md) for sign-off
+and the [owner checklist](privacy-owner-checklist.md) for evidence. Treat the
+older 007–009 rollout example below as historical context. For any separately
+approved database change, verify the actual ledger and use the reviewed
+reconciliation and runtime-role sequence in the
+[security follow-up](ramosolo-security-followup.md).
+
+1. **Confirm recovery before a change window.** Record the current application
+   artifact and configuration versions, database ledger and runtime identity,
+   and responsibility for pausing writers and workers. Verify an encrypted
+   backup or recoverable point, restore access and a successful isolated restore
+   rehearsal. Disconnect provider transports in the restore environment.
+   Rehearse preserving all appointments, account links, audit and consent
+   history, including withdrawals that arrived after a recovery point.
+2. **Stage the application with features closed.** Use synthetic data, fake
+   mail and disabled SMS, OIDC and appointment email. Leave the booking terms
+   approval digest unset. Verify the current draft notice and contact placeholder,
+   generic booking enquiry, disabled representative access and absence of
+   marketing. Verify HTTPS, no-store, trusted hosts and redacted diagnostics
+   at the edge. Review the redacted release scan for the exact candidate.
+3. **Activate only individually signed settings.** Publish an approved notice
+   and the independently verified request channel together by reviewing
+   `policy_info.py` and the policy templates. Reconcile their contents with the
+   approved provider and retention decisions before setting an effective date.
+   For pricing, validate the versioned JSON against the approved medical
+   institution and service categories. Hash the UTF-8 text of the numeric
+   institution ID, one LF, then the exact `BOOKING_TERMS_JSON` value with
+   `booking_terms.booking_terms_sha256`. Record the digest with the approval.
+   Set `PUBLIC_INSTITUTION_ID`, the exact JSON text and
+   `BOOKING_TERMS_APPROVED_SHA256` together. A missing or mismatched digest keeps
+   terms hidden. The digest binds the deployed values to the recorded approval.
+   A changed institution, amount, wording or JSON formatting needs a new digest.
+4. **Check each stage before moving on.** On separately authorised staging after
+   deployment, open `/book` anonymously and compare the institution, approved
+   fee/deposit, currency and all terms against the signed record. Verify fallback
+   for unlisted categories and the enquiry-only wording. Check mobile keyboard
+   navigation and CSRF. On the notice pages, compare contact, effective date,
+   provider and retention statements with the decision sheet. Use a synthetic
+   patient and representative account to check that only the patient's own
+   information is visible and that direct clinical URLs are denied. Check
+   application and approved edge diagnostics with synthetic canaries, and
+   confirm that public and protected pages request only first-party resources
+   unless an approved integration was intentionally invoked.
+5. **Gate any outbound pilot separately.** With fake transports, queue an
+   appointment notice, withdraw the permission, then reselect email. The
+   old appointment notice must be suppressed and an unrelated security notice
+   must remain eligible. Reject marketing at both enqueue and render. Reconcile
+   the existing queue before resuming any approved worker. Activate a provider
+   only in a separate approved window with its existing enablement, scope,
+   verified destination, recipient and quota controls. Keep marketing and
+   guardian access disabled. The scope of any future representative pilot
+   requires separate software, grant review and authorisation.
+
+If a check fails, stop the affected worker or route and revert the configuration
+or previous reviewed application artifact. For pricing, unset the approval digest
+and verify the generic enquiry page. For a notice or contact mismatch, restore the
+previous approved text or the draft if approval is still pending. Keep withdrawals
+and their provenance. A recovery restore must reconcile post-restore-point consent
+changes and pending jobs before sending can resume. Avoid requeuing records that
+were withdrawn, cancelled or already delivered.
+
+### Representative authority draft for review
+
+Review artifact `supabase/review/representative_authority_draft.sql`, SHA-256
+`7653DA9D98C55A03249CF36FA4821D2140EC7A782CB718627AB3F902F7FF9A79`.
+Verify the exact bytes with
+`Get-FileHash -LiteralPath supabase/review/representative_authority_draft.sql -Algorithm SHA256`.
+
+- **Dependencies.** The private `ramosolo` schema, the `patients (id, institution_id)`
+  uniqueness from reviewed migration 017, and the existing
+  `memberships (user_id, institution_id)` uniqueness. Review with the migration
+  principal that can create the new objects. Include the proposed restricted web
+  and worker roles and the standard Data API roles in the grants review.
+- **Impact to verify.** The draft creates one empty authority-decision table,
+  its identity sequence and indexes. It enables RLS and removes access from
+  named service and API roles if present. It contains no data backfill, existing
+  table DDL or ledger write. Confirm no effective access from inherited roles,
+  schema exposure or publications. Flask-Login remains the application boundary.
+- **Preservation rehearsal for separate approval.** The fixture
+  `test_reconciliation_migrated_fixture_supports_app_writes_and_boundaries`
+  in `tests/test_independent_postgres.py` snapshots existing row projections,
+  table owners/ACLs/RLS and ledger values before the draft, then checks equality
+  and an empty new table. It also checks cross-institution and clinical-scope
+  rejection, inaccessible rows for API/service roles and unchanged Flask
+  authorisation. Before staging approval, repeat this on an isolated synthetic
+  fixture matching the intended major version and confirm unchanged booking,
+  payment and history relationships and active withdrawal safeguards. Store only
+  aggregate pass/fail evidence. The prior synthetic run covered the permissions
+  and authorisation assertions. The new preservation assertions await rehearsal.
+
 ## Stop conditions before any live command
 
 1. Reconcile this checkout with the deployed application's richer booking,
@@ -109,14 +201,19 @@ configuration with a local demo configuration.
 
 Have the operator configure `APP_ENV=production`, `DB_SCHEMA=ramosolo`,
 `PYTHON_DOTENV_DISABLED=1`, `FLASK_DEBUG=0`, the protected signing key and database
-connection, and the **actual approved** `APP_TRUSTED_HOSTS`. Never use a synthetic
+connection with `sslmode=verify-full` and the provider CA, the actual
+`APP_TRUSTED_HOSTS`, and the matching HTTPS `AUTH_PUBLIC_URL`. Never use a synthetic
 test key live. `APP_TRUSTED_PROXY_HOPS=0` is the default; use `1` only behind one
-controlled HTTPS terminator that overwrites forwarded scheme, with direct backend
+controlled HTTPS terminator that overwrites forwarded scheme and client address, with direct backend
 access blocked. Keep `CALENDAR_SYNTHETIC_DELIVERIES` absent from real-data runtime.
-Verify the existing approved server dependencies and run:
+Verify the existing approved server dependencies.
+
+For a same-host TLS proxy using Waitress forwarding support, set
+`APP_TRUSTED_PROXY_HOPS=0` and use the reviewed peer and trusted headers in the
+[security follow-up](ramosolo-security-followup.md).
 
 ```text
-waitress-serve --listen=127.0.0.1:8000 --call wsgi:create_production_app
+waitress-serve --listen=127.0.0.1:8000 --trusted-proxy=127.0.0.1 --trusted-proxy-count=1 --trusted-proxy-headers="x-forwarded-for x-forwarded-proto" --call wsgi:create_production_app
 ```
 
 Do not expose the development server. The edge must terminate valid HTTPS,

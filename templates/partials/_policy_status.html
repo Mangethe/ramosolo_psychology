@@ -5,6 +5,7 @@
 </div>
 <nav class="policy-navigation" aria-label="Practice information pages">
   <a href="{{ url_for('med.privacy_notice') }}"{% if request.endpoint=='med.privacy_notice' %} aria-current="page"{% endif %}>POPIA / Privacy Notice</a>
+  <a href="{{ url_for('med.cookies_policy') }}"{% if request.endpoint=='med.cookies_policy' %} aria-current="page"{% endif %}>Cookies policy</a>
   <a href="{{ url_for('med.data_management') }}"{% if request.endpoint=='med.data_management' %} aria-current="page"{% endif %}>Data Management Declaration</a>
   <a href="{{ url_for('med.professional_information') }}"{% if request.endpoint=='med.professional_information' %} aria-current="page"{% endif %}>Professional Information</a>
 </nav>

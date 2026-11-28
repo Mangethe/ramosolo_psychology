@@ -13,10 +13,10 @@ The user subsequently supplied the actual navbar, footer and chat markup as text
 The navbar and footer were adapted to this checkout's medical routes. Their
 corporate/division/search/profile/social endpoints and logo image are absent in
 this repository; no broken links, invented destinations or extra division were
-added. Education remains an institution placeholder. The chat source was reviewed
-as a reference and is **not included, enabled or connected**. There is no chat
-launcher, AI request or new external service. No inline chat CSS/JavaScript was
-copied into the application.
+added. Education remains an institution placeholder. The original chat example
+was reviewed as a reference. The local general-questions chatbot uses preset
+answers on the signed-out home and inpatient pages. It uses no free-text input,
+network calls or browser storage for replies.
 
 During the original shell phase, readable business-card images, `main_base.html`
 and the supplied stylesheet were unavailable. The subsequent privacy phase received
@@ -56,9 +56,10 @@ against the scheduling workflow.
   all existing server route/query checks remain in force.
 - `partials/_footer.html`: shared four-column practice/enquiry/contact/privacy
   footer on public and portal pages. Links target working routes and privacy
-  anchors. Draft privacy/data-management/professional pages now exist from the subsequent
-  phase; approved privacy/terms/security notices still require owner review; nonexistent policy routes were
-  not invented or presented as approved legal notices.
+  anchors. The shared footer links to the cookies policy and HTML sitemap.
+  Draft policy pages remain pending owner approval.
+- `/sitemap.xml` uses the configured `AUTH_PUBLIC_URL` as its origin and lists
+  public, indexable pages. The HTML sitemap also links to the policy drafts.
 - `partials/_brand.html`: shared text brand with decorative, hidden-from-assistive-
   technology CSS accent. The unavailable example logo is not referenced as an
   asset, preventing a broken image request.

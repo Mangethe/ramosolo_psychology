@@ -11,7 +11,12 @@
 <body class="public-body">
   <a class="skip" href="#main">Skip to content</a>
   {% set shell='public' %}{% include 'partials/_navbar.html' %}
-  <main id="main" class="public-main" tabindex="-1">{% include 'partials/flashes.html' %}{% block content %}{% endblock %}</main>
+  <main id="main" class="public-main" tabindex="-1">
+    {% include 'partials/flashes.html' %}{% block content %}{% endblock %}
+    {% if not current_user.is_authenticated and request.endpoint in ('med.home', 'med.inpatient') %}
+      {% include 'partials/_general_questions.html' %}
+    {% endif %}
+  </main>
   {% include 'partials/_footer.html' %}
   {% include 'partials/_session_warning.html' %}
   {% block scripts %}{% endblock %}

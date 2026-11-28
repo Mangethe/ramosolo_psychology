@@ -4,6 +4,11 @@
 **/.env export-ignore
 **/.env.* export-ignore
 .env.example -export-ignore
+.flaskenv export-ignore
+.pgpass export-ignore
+pgpass.conf export-ignore
+.npmrc export-ignore
+.pypirc export-ignore
 .booking-test-postgres export-ignore
 .booking-test-postgres/** export-ignore
 supabase/.temp export-ignore

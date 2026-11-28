@@ -4,11 +4,16 @@ import secrets
 from datetime import timedelta
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
+from booking_terms import approved_booking_terms
 
 
 def settings():
     production = os.getenv('APP_ENV') == 'production'
     secret = os.getenv('FLASK_SECRET_KEY')
+    public_institution = os.getenv('PUBLIC_INSTITUTION_ID', '').strip()
+    if public_institution and not re.fullmatch(r'[1-9][0-9]{0,8}', public_institution):
+        raise RuntimeError('PUBLIC_INSTITUTION_ID must be a positive institution ID.')
+    public_institution_id = int(public_institution) if public_institution else None
     # Both names are documented by the protected Supabase workflow. An empty
     # DATABASE_URL must not hide a configured SUPABASE_DB_URL.
     url = (os.getenv('DATABASE_URL', '').strip()
@@ -26,7 +31,7 @@ def settings():
     # Explicit schema names still support historical/local installations.
     schema = os.getenv('DB_SCHEMA', 'ramosolo').strip()
     hosts=[host.strip() for host in os.getenv('APP_TRUSTED_HOSTS','').split(',') if host.strip()]
-    if any(not re.fullmatch(r'\.?[A-Za-z0-9][A-Za-z0-9.:-]*|\[::1\]',host) or '*' in host for host in hosts):
+    if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*|\[::1\]', host) for host in hosts):
         raise RuntimeError('APP_TRUSTED_HOSTS must contain explicit hostnames.')
     proxy=os.getenv('APP_TRUSTED_PROXY_HOPS','0')
     if proxy not in ('0','1'):raise RuntimeError('APP_TRUSTED_PROXY_HOPS must be 0 or 1.')
@@ -43,9 +48,12 @@ def settings():
         # Poolers may ignore startup options. The engine sets the schema for
         # each transaction, including after a rollback on the same connection.
         engine['connect_args'] = {'connect_timeout': 10}
-        if production and parsed_url.query.get('sslmode') not in ('require','verify-ca','verify-full'):
-            raise RuntimeError('Production database connections require an explicit secure sslmode.')
+        if production and parsed_url.query.get('sslmode') != 'verify-full':
+            raise RuntimeError('Production database connections require sslmode=verify-full.')
     return dict(SECRET_KEY=secret or secrets.token_hex(32),
+        PUBLIC_INSTITUTION_ID=public_institution_id,
+        BOOKING_TERMS=approved_booking_terms(os.getenv('BOOKING_TERMS_JSON'), public_institution_id,
+                                            os.getenv('BOOKING_TERMS_APPROVED_SHA256')),
         SQLALCHEMY_DATABASE_URI=url, SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SQLALCHEMY_ENGINE_OPTIONS=engine, SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=production,

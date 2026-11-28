@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Sitemap · Ramosolo{% endblock %}
+{% block content %}
+<article class="prose policy-page">
+  <h1>Sitemap</h1>
+  <ul>
+    {% for endpoint, label in pages if endpoint != request.endpoint %}
+    <li><a href="{{ url_for(endpoint) }}">{{ label }}</a></li>
+    {% endfor %}
+    {% if not current_user.is_authenticated %}
+    <li><a href="{{ url_for('med.home') }}#general-questions">General questions chatbot</a></li>
+    {% endif %}
+  </ul>
+  <h2>Practice information drafts</h2>
+  <ul>
+    {% for endpoint, label in drafts %}
+    <li><a href="{{ url_for(endpoint) }}">{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+  <p><a href="{{ url_for('med.sitemap_xml') }}">XML sitemap</a></p>
+</article>
+{% endblock %}

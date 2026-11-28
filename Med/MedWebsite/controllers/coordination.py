@@ -8,7 +8,7 @@ from flask_login import current_user
 from sqlalchemy import select, func, update
 from sqlalchemy.exc import IntegrityError
 from extensions import db
-from access import (require_roles, require_capability, accessible_patient, patient_scope, appointment_institution,
+from access import (require_roles, require_capability, accessible_patient, patient_scope, appointment_assignment, appointment_institution,
                     can_patient, audit, audit_views)
 from models import (Patient, Admission, CarePlan, DischargeFollowup, Referral, ReferralClinical,
     CommunicationDecision, CareReview, CareReviewSignoff, CoordinationHistory, CoordinationPolicy,
@@ -236,7 +236,7 @@ def referral_detail(referral_id):
                 if identity:
                     appointment=db.session.scalar(select(Appointment).where(Appointment.id==identity,
                         Appointment.patient_id==patient.id,appointment_institution(patient.institution_id),
-                        Appointment.status=='scheduled'))
+                        appointment_assignment(), Appointment.status=='scheduled'))
                     if not appointment:abort(400)
                     row.appointment_id=appointment.id;row.appointment_at=appointment.starts_at
                 else:row.appointment_at=date('appointment_at',True)
@@ -252,7 +252,7 @@ def referral_detail(referral_id):
             appointment=db.session.scalar(select(Appointment).where(
                 Appointment.id==request.form.get('appointment_id',type=int),
                 Appointment.patient_id==patient.id,appointment_institution(patient.institution_id),
-                Appointment.status=='scheduled'))
+                appointment_assignment(), Appointment.status=='scheduled'))
             if not appointment:abort(400)
             prior=row.appointment_id;row.appointment_id=appointment.id;row.appointment_at=appointment.starts_at
             record_history('referral',row,'appointment_rearranged',outcome=f'{prior or 0}->{appointment.id}')
@@ -518,14 +518,14 @@ def export_actions():
 def legacy_followup(followup_id):
     table=legacy_table('attendance_followups')
     if table is None:abort(404)
-    query=select(table).join(Appointment,Appointment.id==table.c.appointment_id).where(table.c.id==followup_id,
+    query=select(table, Appointment.patient_id).join(Appointment,Appointment.id==table.c.appointment_id).where(table.c.id==followup_id,
         table.c.institution_id==g.membership.institution_id,
+        appointment_institution(g.membership.institution_id), appointment_assignment(),
         Appointment.patient_id.in_(patient_scope().with_only_columns(Patient.id)))
     row=db.session.execute(query.with_for_update() if request.method=='POST' else query).mappings().first()
     if not row:abort(404)
     if g.membership.role=='nurse' and current_user.id not in (row.get('owner_id'),row.get('cover_id')):abort(404)
-    patient_id=db.session.scalar(select(Appointment.patient_id).where(Appointment.id==row['appointment_id']))
-    patient=accessible_patient(patient_id)
+    patient=accessible_patient(row['patient_id'])
     if request.method=='POST':
         no_files()
         if request.form.get('version',type=int)!=row['revision']:abort(409)

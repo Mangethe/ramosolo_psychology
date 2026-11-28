@@ -13,7 +13,7 @@ from datetime import timedelta
 from policy_info import POLICY,OFFICIAL_LINKS,CARD
 
 
-PAGES=('/privacy-notice','/data-management','/professional-information')
+PAGES=('/privacy-notice','/cookies-policy','/data-management','/professional-information')
 
 
 @pytest.mark.parametrize('role',[None,'patient','dr_assist','nurse','dr','admin'])
@@ -23,7 +23,7 @@ def test_drafts_public_for_all_roles_without_private_data(env,role):
     for path in PAGES:
         r=client.get(path);assert r.status_code==200
         body=r.get_data(as_text=True)
-        assert 'Unpublished policy draft' in body and '0.1-draft' in body
+        assert 'Unpublished policy draft' in body and POLICY['version'] in body
         assert 'Effective date: Not effective' in body
         assert 'Approved privacy contact: not yet supplied' in body if path=='/privacy-notice' else True
         assert SECRET not in body and CLINICAL not in body
@@ -71,7 +71,8 @@ def test_declaration_preserves_unknowns_and_actual_integration_limits(env):
     for expected in ('Supabase PostgreSQL','processing region','have not been confirmed',
         'No country or region is asserted','No approved practice retention schedule',
         'not production backup or disaster-recovery tests','not continuously monitored',
-        'synthetic delivery','sandbox notification','no external AI service',
+        'synthetic delivery','sandbox notification','external AI service', '15 minutes idle',
+        'Twilio Verify', 'includes no session replay',
         'does not call a live payment gateway','no automated regulatory filing'):
         assert expected in body,expected
     assert 'end-to-end encryption or guarantee confidentiality' in body  # explicit non-claim
@@ -83,6 +84,7 @@ def test_privacy_required_optional_recipients_requests_children_and_complaints(e
         'Proposed process for owner approval','verify identity','retention restrictions',
         'approved child/guardian-consent and access policy has not been provided',
         'does not automatically erase care records','No Information Officer',
+        'Marketing email and SMS are disabled', 'Guardian portal access is inactive',
         'Optional communication consent is not presented as the basis for every healthcare-processing activity'):
         assert expected in body,expected
     assert OFFICIAL_LINKS['complaints'] in body and OFFICIAL_LINKS['popia_forms'] in body
@@ -113,3 +115,57 @@ def test_booking_csrf_and_policy_route_methods(env):
     for path in PAGES:assert client.post(path).status_code==405
     assert client.get('/docs/privacy-owner-checklist.md').status_code==404
     assert client.get('/static/privacy-owner-checklist.md').status_code==404
+
+
+def test_cookie_policy_matches_the_portal(env):
+    response = env[0].test_client().get('/cookies-policy')
+    body = response.get_data(as_text=True)
+    for detail in ('session</code>', 'remember_token</code>', 'HttpOnly', 'SameSite=Lax',
+                   'Secure in production', '15 minutes', 'two-hour maximum', 'nor stores or sends'):
+        assert detail in body
+    assert 'Set-Cookie' not in response.headers
+
+
+def test_public_booking_terms_are_scoped_validated_and_escaped(env, monkeypatch):
+    import json
+    from booking_terms import booking_terms, booking_terms_sha256
+    from config import settings
+
+    app, _, patients, *_ = env
+    data = {'Individual therapy': {'currency': 'ZAR', 'fee': '123.00', 'deposit': '0.00',
+        'cancellation': 'Synthetic <script>terms</script>', 'no_show': 'Synthetic no-show',
+        'refund': 'Synthetic refund process'}}
+    raw = json.dumps(data)
+    with pytest.raises(RuntimeError, match='PUBLIC_INSTITUTION_ID'):
+        booking_terms(raw, None)
+    with pytest.raises(RuntimeError, match='valid public booking fees'):
+        booking_terms(raw.replace('"0.00"', '"400.00"'), patients[0].institution_id)
+    with pytest.raises(RuntimeError, match='valid public booking fees'):
+        booking_terms(raw.replace('"Individual therapy"', '"Unlisted service"'), patients[0].institution_id)
+    institution = patients[0].institution_id
+    approval = booking_terms_sha256(raw, institution)
+    monkeypatch.setenv('BOOKING_TERMS_JSON', raw)
+    monkeypatch.setenv('PUBLIC_INSTITUTION_ID', str(institution))
+    monkeypatch.delenv('BOOKING_TERMS_APPROVED_SHA256', raising=False)
+    browser = app.test_client()
+    app.config['BOOKING_TERMS'] = settings()['BOOKING_TERMS']
+    unpublished = browser.get('/book').get_data(as_text=True)
+    assert 'ZAR 123.00' not in unpublished and 'Synthetic refund process' not in unpublished
+    assert 'ask the practice for the fee' in unpublished
+
+    monkeypatch.setenv('BOOKING_TERMS_APPROVED_SHA256', approval)
+    monkeypatch.setenv('BOOKING_TERMS_JSON', raw.replace('123.00', '124.00'))
+    assert settings()['BOOKING_TERMS'] == {}
+    monkeypatch.setenv('BOOKING_TERMS_JSON', raw)
+    monkeypatch.setenv('PUBLIC_INSTITUTION_ID', str(institution + 1))
+    assert settings()['BOOKING_TERMS'] == {}
+
+    monkeypatch.setenv('PUBLIC_INSTITUTION_ID', str(institution))
+    app.config.update(PUBLIC_INSTITUTION_ID=institution, BOOKING_TERMS=settings()['BOOKING_TERMS'])
+    for response in (browser.get('/book'), browser.post('/book', data={'full_name': 'Synthetic'})):
+        body = response.get_data(as_text=True)
+        assert body.index('ZAR 123.00') < body.index('Send request')
+        assert 'ZAR 0.00' in body and 'Synthetic refund process' in body
+        assert '&lt;script&gt;terms&lt;/script&gt;' in body
+        assert 'authorises no payment' in body
+        assert 'name="birth_date"' not in body and 'type="file"' not in body

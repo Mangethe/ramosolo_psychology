@@ -205,11 +205,11 @@ def preferences():
             db.session.add(row)
         row.channels=channels; row.communication_consent=consent == 'yes'; row.updated_at=utcnow()
         # This legacy projection no longer grants purpose-specific consent. Declines restrict it.
-        if consent=='no':
+        if consent=='no' or 'email' not in channels:
             from coordination_services import CHANNELS, suppress_unsent
             from models import CommunicationDecision
             for purpose in ('reminders','administrative_contact'):
-                for channel in CHANNELS:
+                for channel in CHANNELS if consent == 'no' else ('email',):
                     decision=CommunicationDecision(institution_id=patient.institution_id,patient_id=patient.id,
                         purpose=purpose,channel=channel,scope='*',status='withdrawn',destination='',
                         timezone='Africa/Johannesburg',method='patient_portal',notice_version='legacy-preferences-withdrawal-v1',

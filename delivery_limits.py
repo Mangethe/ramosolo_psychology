@@ -20,8 +20,9 @@ def reserve(now, *buckets):
             claimed = db.session.execute(insert.on_conflict_do_update(index_elements=[DeliveryLimit.key],
                 set_={'count': case((expired, 1), else_=DeliveryLimit.count + 1),
                       'expires_at': case((expired, now + lifetime), else_=DeliveryLimit.expires_at)},
-                where=or_(expired, DeliveryLimit.count < maximum))).rowcount
-            if claimed != 1:
+                where=or_(expired, DeliveryLimit.count < maximum))
+                .returning(DeliveryLimit.count)).scalar_one_or_none()
+            if claimed is None:
                 savepoint.rollback()
                 return False
     return True

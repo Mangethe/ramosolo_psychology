@@ -88,8 +88,9 @@ def queue_one(appointment, patient, kind, lead=None):
     insert = postgres_insert if db.session.get_bind().dialect.name == 'postgresql' else sqlite_insert
     inserted = db.session.execute(insert(SecurityEmail).values(dedupe_key=key, kind=kind,
         user_id=patient.user_id, recipient=recipient, created_at=now, next_attempt_at=due,
-        state='pending', attempts=0).on_conflict_do_nothing(index_elements=[SecurityEmail.dedupe_key])).rowcount
-    if inserted:
+        state='pending', attempts=0).on_conflict_do_nothing(index_elements=[SecurityEmail.dedupe_key])
+        .returning(SecurityEmail.dedupe_key)).scalar_one_or_none()
+    if inserted is not None:
         db.session.add(AppointmentEmail(dedupe_key=key, institution_id=patient.institution_id,
             appointment_id=appointment.id, patient_id=patient.id, schedule_version=appointment.schedule_version,
             scheduled_start=appointment.starts_at, decision_id=decision.id, lead_minutes=lead))

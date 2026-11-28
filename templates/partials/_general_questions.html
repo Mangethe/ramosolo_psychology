@@ -1,0 +1,30 @@
+{% macro question(id, label) %}
+  <li>
+    <button type="button" data-answer="{{ id }}">{{ label }}</button>
+    <template id="{{ id }}">{{ caller() }}</template>
+  </li>
+{% endmacro %}
+<details class="general-questions panel" id="general-questions">
+  <summary>Ask a general question</summary>
+  <p>Choose a question about the practice, appointments or the portal.</p>
+  <ul class="general-question-options" hidden>
+    {% call question('question-appointment', 'How do I request an appointment?') %}
+      <p>Use the <a href="{{ url_for('med.book') }}">appointment enquiry form</a> to send your own contact details and preferred time. The practice confirms appointments separately.</p>
+    {% endcall %}
+    {% call question('question-fees', 'Where can I check fees and terms?') %}
+      <p>See the <a href="{{ url_for('med.book') }}#booking-costs">booking terms</a>. Ask the practice for any unlisted fees, deposits, cancellation or refund terms before confirming.</p>
+    {% endcall %}
+    {% call question('question-inpatient', 'How do I ask about inpatient care?') %}
+      <p>See <a href="{{ url_for('med.inpatient') }}">inpatient enquiries</a> for information on contacting the practice about inpatient arrangements.</p>
+    {% endcall %}
+    {% call question('question-sign-in', 'How do I sign in?') %}
+      <p>Use <a href="{{ url_for('auth.login') }}">portal sign-in</a> if the practice has provided an account. See <a href="{{ url_for('auth.help_signing_in') }}">sign-in help</a> for account recovery information.</p>
+    {% endcall %}
+    {% call question('question-privacy', 'Does the chatbot save my choices?') %}
+      <p>Choices stay on this page. See the <a href="{{ url_for('med.cookies_policy') }}">cookies policy</a> and <a href="{{ url_for('med.privacy_notice') }}">privacy notice</a> for details.</p>
+    {% endcall %}
+  </ul>
+  <div class="general-question-reply" aria-live="polite" aria-atomic="true"></div>
+  <noscript><p><a href="{{ url_for('med.sitemap') }}">Browse public pages</a></p></noscript>
+</details>
+<script defer src="{{ url_for('static', filename='js/general-questions.js') }}"></script>

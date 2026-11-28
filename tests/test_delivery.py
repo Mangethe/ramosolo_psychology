@@ -232,6 +232,33 @@ def test_reminder_rechecks_current_scope_on_worker(env, invalidate):
     assert db.session.get(AppointmentEmail, reminder.dedupe_key)
 
 
+def test_email_withdrawal_does_not_revive_queued_appointments_or_stop_security(env):
+    _, _, appointment, _ = booked(env)
+    client = as_user(env, 'patient')
+    path = '/med/preferences'
+    preferences = {'patient_id': appointment.patient_id, 'communication_consent': 'yes'}
+    assert client.post(path, data={**preferences, 'channels': ['portal']}).status_code == 302
+    assert client.post(path, data={**preferences, 'channels': ['portal', 'email']}).status_code == 302
+
+    for job in appointment_jobs():
+        job.next_attempt_at = 1
+    security_email.enqueue(env[1]['patient'], 'change', 'synthetic-security-withdrawal', detail='Synthetic.')
+    db.session.commit()
+    provider = security_email.FakeMailProvider()
+    assert security_email.deliver_pending(provider) == 1
+    assert all(job.state == 'cancelled' for job in appointment_jobs())
+    assert {message.subject for message in provider.messages.values()} == {'Ramosolo account security change'}
+
+
+def test_marketing_purpose_cannot_enter_or_render_from_transactional_mail(env):
+    from types import SimpleNamespace
+
+    with pytest.raises(ValueError, match='Unsupported account email purpose'):
+        security_email.enqueue(env[1]['patient'], 'marketing', 'synthetic-marketing')
+    assert security_email.render(SimpleNamespace(kind='marketing')) is None
+    assert db.session.get(SecurityEmail, 'synthetic-marketing') is None
+
+
 PHONE_PATH = '/auth/security/phone'
 FIRST = '+12025550123'
 SECOND = '+12025550124'

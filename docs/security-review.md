@@ -1,5 +1,7 @@
 # Focused Flask browser-exposure security review
 
+See [Ramosolo security follow-up](ramosolo-security-followup.md) for the latest local findings, fixes and deployment checks.
+
 Current acceptance rerun: see `verification/acceptance-review.md`. Its real
 headless Chrome checks supersede the historical browser-host limitation below
 for the listed local surfaces; production edge checks remain unverified.
@@ -14,7 +16,7 @@ files. This is a focused review, not a production-readiness certification.
 | Finding | Fix and evidence |
 |---|---|
 | Flask's normal static handler serves arbitrary files beneath `static`, including hidden files | Reproduced against an isolated vanilla Flask instance with a fake `.env`. `SecureFlask` now serves only the explicit release inventory in `security.PUBLIC_ASSETS` (currently `css/style.css`). Traversal, dotfiles, Python, SQL, backups, handoff files, logs, uploads, JSON, unreviewed CSS and source maps are rejected. Symlink escapes are rejected. The real static inventory contained only the public stylesheet; no real credential disclosure was established. |
-| Production TLS validation accepted any URL containing `sslmode=`, including `disable` | SQLAlchemy URL parsing now requires `require`, `verify-ca` or `verify-full`. Invalid URLs produce a generic configuration error without echoing the URL. `verify-full` with the correct CA is preferred for deployment; `require` encrypts without providing equivalent server-identity verification. |
+| Production TLS validation allowed database connections without server hostname verification | Production now requires `sslmode=verify-full`. Configure the provider CA and use the certificate hostname. Invalid configuration produces a generic error without echoing the URL. |
 | Debug/exception propagation, host trust and proxy/TLS boundaries lacked explicit production enforcement | Production rejects debug settings and `FLASK_DEBUG`, requires trusted hosts, disables exception propagation, and rejects HTTP. Only an explicitly configured single TLS proxy can supply forwarded scheme; forwarded host/client identity headers are not trusted. Added a Waitress production factory. Invalid-host errors use a minimal response without reflecting the host or trying to build URLs. |
 | Session lifetime relied on refreshable cookies; legacy remember-cookie restoration could bypass the new clock boundary | Successful password login records nonclinical start/last-seen timestamps. Idle timeout is 30 minutes; absolute lifetime is two hours. Missing, malformed, future or expired clocks fail closed. User loading also validates these clocks, blocking legacy remember-cookie restoration. Existing unstamped logins must sign in again. Password-reset session versions and membership checks remain effective. |
 | Cache protection depended on selected URL prefixes | All dynamic/form/error/download responses and authenticated static responses now use `Cache-Control: no-store`, `Pragma: no-cache`, `Expires: 0`, and `Vary: Cookie`. Only successful anonymous public-asset responses may use asset caching. Public forms with CSRF are never shared-cacheable. |
@@ -119,13 +121,13 @@ or credentials. Running it as the management connector cannot attest Flask's rol
   `APP_TRUSTED_HOSTS` list and secure PostgreSQL TLS configuration. Keep passwords,
   database URLs, PATs, signing keys and privileged Supabase credentials exclusively
   in protected server-side configuration; never share them for a test/report.
-- Use the production entry point, for example:
-  `waitress-serve --listen=127.0.0.1:8000 --call wsgi:create_production_app`.
+- Use the production entry point and configure the TLS peer as shown in the
+  [security follow-up](ramosolo-security-followup.md).
   Terminate valid HTTPS at the controlled edge. The edge must redirect HTTP before
   accepting sensitive bodies. The app itself rejects HTTP rather than redirecting
   submitted credentials. Never publish Flask's development server/debugger.
 - `APP_TRUSTED_PROXY_HOPS=0` is the default. Set it to `1` only for exactly one
-  controlled TLS terminator that overwrites forwarded scheme and cannot be
+  controlled TLS terminator that overwrites forwarded scheme and client address and cannot be
   bypassed. Restrict the backend listener/firewall; test spoofed forwarding headers
   against the real topology. This network boundary was not tested live.
 - Do not use the repository as a web document root or static-site upload. Do not

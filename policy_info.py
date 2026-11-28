@@ -1,7 +1,7 @@
 """Public draft metadata only. No officer appointment or approval is implied."""
 POLICY = {
-    'version': '0.1-draft',
-    'prepared_at': '16 November 2026',
+    'version': '0.2-draft',
+    'prepared_at': '28 November 2026',
     'effective_at': 'Not effective — practice approval pending',
     'practice': 'Ponky Ramosolo practice · Ramosolo / Le Sonto Medical',
     'legal_entity': None,
@@ -12,6 +12,9 @@ OFFICIAL_LINKS = {
     'regulator': 'https://inforegulator.org.za/',
     'complaints': 'https://inforegulator.org.za/complaints/',
     'popia_forms': 'https://inforegulator.org.za/popia-forms/',
+    'popia_guidance': 'https://inforegulator.org.za/guidance-notes/',
+    'children_act': 'https://www.gov.za/st/documents/childrens-act',
+    'national_health_act': 'https://www.gov.za/documents/acts/national-health-act-61-2003-23-jul-2004',
     'paia': 'https://inforegulator.org.za/paia/',
     'eservices': 'https://eservices.inforegulator.org.za/services.aspx',
     'compromises': 'https://inforegulator.org.za/2025/08/19/fact-sheet-handling-of-security-compromises/',

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import SecurityError
 from extensions import db, login_manager, csrf
 from config import settings
 from security import SecureFlask, configure_security
@@ -57,8 +58,8 @@ def create_app(test_config=None):
     # the exact proxy count AND prevents direct access to the backend listener.
     if app.config['TRUSTED_PROXY_HOPS']:
         from werkzeug.middleware.proxy_fix import ProxyFix
-        app.wsgi_app=ProxyFix(app.wsgi_app,x_proto=app.config['TRUSTED_PROXY_HOPS'],
-            x_for=0,x_host=0,x_port=0,x_prefix=0)
+        hops = app.config['TRUSTED_PROXY_HOPS']
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=hops, x_for=hops, x_host=0, x_port=0, x_prefix=0)
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -141,12 +142,14 @@ def create_app(test_config=None):
         return body, 503, {'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '60'}
 
     def portal_error(error):
-        from werkzeug.exceptions import SecurityError
         if isinstance(error,SecurityError):
             # Invalid hosts have no URL adapter. Do not call url_for or reflect
             # the supplied hostname while handling that routing rejection.
             return 'Request not available.',400,{'Content-Type':'text/plain; charset=utf-8'}
-        return render_template('errors/error.html',error=error),error.code
+        # Preserve protocol headers such as Retry-After and Allow.
+        response = error.get_response()
+        response.set_data(render_template('errors/error.html', error=error))
+        return response
 
     for code in (400, 401, 403, 404, 405, 409, 410, 413, 415, 422, 429, 500):
         app.register_error_handler(code,portal_error)

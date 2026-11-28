@@ -5,6 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 
 const output=fs.mkdtempSync('C:/Temp/ramosolo-shell-');
+const resultsPath=process.env.RAMOSOLO_BROWSER_RESULTS || 'verification/shell-browser-results.json';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const server=spawn('python',['-u','verification/shell_preview.py'],{windowsHide:true,stdio:['ignore','pipe','pipe']});
 let chrome,ws,diagnose;
@@ -27,7 +28,12 @@ try {
   let debugPort;
   for(let attempt=0;attempt<100;attempt++){
     const portFile=path.join(profile,'DevToolsActivePort');
-    if(fs.existsSync(portFile)){debugPort=fs.readFileSync(portFile,'utf8').split('\n')[0];break;}
+    try {
+      const candidate=fs.readFileSync(portFile,'utf8').split('\n')[0];
+      if(/^\d+$/.test(candidate)){debugPort=candidate;break;}
+    } catch(error) {
+      if(!['ENOENT','EBUSY','EPERM'].includes(error.code))throw error;
+    }
     await pause(150);
   }
   assert(debugPort,'Isolated headless Chrome did not start');
@@ -69,7 +75,7 @@ try {
     const filename=path.join(output,name+'.png');fs.writeFileSync(filename,Buffer.from(result.data,'base64'));report.screenshots.push(filename);}
   async function fit(label){const dimensions=await evaluate('({viewport:innerWidth,scroll:document.documentElement.scrollWidth})');
     assert(dimensions.scroll<=dimensions.viewport+1,label+' overflows viewport '+JSON.stringify(dimensions));report.checks.push(label+': no document horizontal overflow');}
-  async function key(key,code=key){const virtualCode={Enter:13,Tab:9,ArrowRight:39}[key];assert(virtualCode);
+  async function key(key,code=key){const virtualCode={Enter:13,Tab:9,ArrowRight:39,' ':32}[key];assert(virtualCode);
     await cdp('Input.dispatchKeyEvent',{type:'keyDown',key,code,
       windowsVirtualKeyCode:virtualCode,...(key==='Enter'?{text:'\r',unmodifiedText:'\r'}:{})});
     await cdp('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:virtualCode});
@@ -94,15 +100,23 @@ try {
         if(![302,400,403,404].includes(response.status)&&!response.redirected)exposed.push(href);
         if(!clean(text)||text.includes('Werkzeug Debugger'))exposed.push(href);
       }
-      const css=await (await fetch('/static/css/style.css')).text();
-      return {broken,exposed,clean:clean(document.documentElement.outerHTML)&&clean(css),
+      const assets=await Promise.all(['/static/css/style.css','/static/js/session-warning.js'].map(async href=>{
+        const response=await fetch(href);
+        return response.ok&&clean(await response.text())&&!response.headers.has('access-control-allow-origin');
+      }));
+      const status=await fetch('/auth/session-status');
+      const payload=await status.json();
+      const fields=payload.authenticated ? ['absolute_at','authenticated','expires_at','now','page','warning_seconds'] : ['authenticated'];
+      const minimalStatus=JSON.stringify(Object.keys(payload).sort())===JSON.stringify(fields)
+        &&status.headers.get('cache-control')==='no-store'&&clean(JSON.stringify(payload));
+      return {broken,exposed,clean:clean(document.documentElement.outerHTML)&&assets.every(Boolean)&&minimalStatus,
         cleanStorage:clean(JSON.stringify({...localStorage,...sessionStorage})),links:links.length};
     })()`);
     assert.deepEqual(result.broken,[],role+' navigation/footer links');
     assert.deepEqual(result.exposed,[],role+' direct URL exposure');
     assert(result.clean&&result.cleanStorage,role+' response/storage canaries');
     report.checks.push(role+': '+result.links+' local navigation/footer targets and fragments return authorized pages');
-    report.checks.push(role+': HTML, CSS, denied responses and browser storage exclude synthetic secret/foreign record canaries');
+    report.checks.push(role+': HTML, CSS, JavaScript, session JSON, denied responses and browser storage exclude synthetic secret/foreign record canaries');
   }
   await viewport(1440,1000);await navigate('/');await fit('Desktop public home');await screenshot('public-desktop');
   await responseAudit('anonymous');
@@ -115,11 +129,30 @@ try {
   assert.equal(await evaluate("document.querySelector('.mobile-public-menu').open"),true);
   await key('Tab');assert.equal(await evaluate('document.activeElement.textContent.trim()'),'Home');
   await screenshot('public-mobile-menu');report.checks.push('Mobile public menu opens by Enter; Tab reaches Home');
+  await evaluate("document.querySelector('#general-questions summary').focus()");
+  await key('Enter');
+  assert(await evaluate("document.querySelector('#general-questions').open"));
+  await key('Tab');
+  await key('Enter');
+  assert(await evaluate("document.querySelector('.general-question-reply a').pathname==='/book'"));
+  await fit('Mobile general questions');
+  report.checks.push('Mobile chatbot answers a keyboard-selected question using a local link');
   await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
   assert.equal(await evaluate("matchMedia('(prefers-reduced-motion: reduce)').matches"),true);
   report.checks.push('Reduced-motion media query active');
-  for(const route of ['/inpatient','/governance','/privacy-notice','/data-management','/professional-information','/book','/auth/login']){
+  for(const route of ['/inpatient','/governance','/privacy-notice','/cookies-policy','/data-management','/professional-information','/sitemap','/book','/auth/login']){
     await navigate(route);await fit('Mobile '+route);
+    if(route==='/book'){
+      assert(await evaluate("document.body.innerText.includes('ZAR 123.00') && document.body.innerText.includes('Synthetic refund terms')"));
+      await evaluate("document.querySelector('form a[href=\"/privacy-notice\"]').focus()");
+      await key('Tab');
+      assert(await evaluate("document.activeElement.name==='consent' && !document.activeElement.checked"));
+      await key(' ','Space');
+      assert(await evaluate("document.activeElement.checked"));
+      await key('Tab');
+      assert(await evaluate("document.activeElement.textContent.trim()==='Send request'"));
+      report.checks.push('Mobile booking shows configured terms and supports keyboard consent and submit navigation');
+    }
     if(['/privacy-notice','/data-management','/professional-information'].includes(route)){
       assert.equal(await evaluate("document.querySelector('.policy-draft strong').textContent.includes('Unpublished')"),true);
       await viewport(1440,1000);await fit('Desktop '+route);
@@ -132,21 +165,36 @@ try {
   for(const role of ['patient','dr_assist','nurse','dr','admin']){
     await navigate('/auth/login');
     await evaluate(`document.querySelector('[name=email]').value=${JSON.stringify(role+'@example.test')};document.querySelector('[name=password]').value='Synthetic-preview-123!';document.querySelector('.login-panel form').requestSubmit();`);
-    await until("location.pathname==='/med' && document.readyState==='complete' && document.querySelector('.workspace-main')!==null");
+    await until("location.pathname==='/med' && document.readyState==='complete' && !document.documentElement.classList.contains('session-screen-locked') && document.querySelector('.workspace-main')!==null");
     await fit('Mobile '+role+' workspace');
     await evaluate("document.querySelector('.mobile-workspace-menu summary').focus()");await key('Enter');
     assert.equal(await evaluate("document.querySelector('.mobile-workspace-menu').open"),true);
     await key('Tab');assert.equal(await evaluate('document.activeElement.textContent.trim()'),'Overview');
     report.checks.push(role+': workspace menu keyboard navigation and authenticated CSRF login');
     await responseAudit(role);
+    if(role==='patient'){
+      await navigate('/med/preferences');
+      await until("!document.documentElement.classList.contains('session-screen-locked')");
+      await fit('Mobile contact preferences');
+      assert(await evaluate("document.body.innerText.includes('Removing email withdraws')"));
+      await evaluate("document.querySelector('[name=channels][value=email]').focus()");
+      await key(' ','Space');
+      assert(await evaluate("document.activeElement.value==='email' && document.activeElement.checked"));
+      for(let step=0;step<3;step++)await key('Tab');
+      assert(await evaluate("document.activeElement.name==='communication_consent'"));
+      await key('Tab');
+      assert(await evaluate("document.activeElement.textContent.trim()==='Save preferences'"));
+      report.checks.push('Mobile contact preferences support keyboard changes and save navigation');
+    }
     if(role==='dr_assist'){
       await screenshot('assistant-mobile-menu');
-      await evaluate("document.querySelector('.mobile-workspace-menu summary').focus()");await key('Enter');
-      assert.equal(await evaluate("document.querySelector('.mobile-workspace-menu').open"),false);
+      await navigate('/med/appointments');
+      await until("!document.documentElement.classList.contains('session-screen-locked') && !document.querySelector('.workspace-main').inert");
       await evaluate("document.querySelector('.table-wrap').focus()");await key('ArrowRight');
       await until("document.querySelector('.table-wrap').scrollLeft>0");
       report.checks.push('Mobile appointment table scrolls with ArrowRight when keyboard focused');
       await screenshot('assistant-mobile-table');
+      await navigate('/med');
       await viewport(1440,1000);await screenshot('assistant-desktop');
     }
     await viewport(1440,1000);await fit('Desktop '+role+' workspace');await viewport(390,844);
@@ -157,15 +205,15 @@ try {
   assert(accessibility.nodes.some(n=>n.role?.value==='main'));
   report.checks.push('Browser accessibility tree includes main landmark');
   assert.equal(report.externalRequests.length,0,'Unexpected external browser request');
-  report.checks.push('No external page requests or chat integration');
+  report.checks.push('No external page requests, including when using the general questions chatbot');
   report.status='passed';
-  fs.writeFileSync('verification/shell-browser-results.json',JSON.stringify(report,null,2)+'\n');
+  fs.writeFileSync(resultsPath,JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report,null,2));
 } catch(error){
   report.status='failed';report.error=error.message;report.stack=error.stack;
   if(diagnose)report.syntheticBrowserState=await diagnose();
   report.syntheticServerDiagnostics=serverDiagnostics;
-  fs.writeFileSync('verification/shell-browser-results.json',JSON.stringify(report,null,2)+'\n');
+  fs.writeFileSync(resultsPath,JSON.stringify(report,null,2)+'\n');
   console.error(error.message);process.exitCode=1;
 } finally {
   ws?.close();chrome?.kill();server.kill();

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import User, Institution, Membership, Patient, BookingRequest, AuditEvent, ROLES
-from access import require_roles, require_capability, audit, accessible_patient
+from access import require_roles, require_capability, audit, patient_scope
 from medical_services import doctors
 from account_verification import issue, valid_address, welcome_if_active
 
@@ -44,7 +44,10 @@ def users():
             abort(400)
         patient = None
         if role == 'patient' and patient_id:
-            patient = accessible_patient(patient_id)
+            patient = db.session.scalar(patient_scope().where(Patient.id == patient_id).with_for_update()
+                                        .execution_options(populate_existing=True))
+            if not patient:
+                abort(404)
             if patient.user_id or patient.doctor_id != doctor_id:
                 abort(400)
         # Existing accounts cannot be claimed or have their password reset by another institution.
